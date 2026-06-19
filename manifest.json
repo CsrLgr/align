@@ -1,0 +1,12 @@
+{
+  "name": "CSR Align Clock",
+  "short_name": "Align",
+  "description": "A 24-hour clock starting at sunrise",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0d0d0d",
+  "theme_color": "#c0b5a5",
+  "orientation": "portrait-primary",
+  "icons": []
+}
