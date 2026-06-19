@@ -24,11 +24,11 @@
   .real-time { font-size:13px; color:#666; margin-top:0.5rem; }
   .ruler-wrap { display:flex; flex-direction:column; align-items:center; }
   .ruler-track {
-    width: 36px;
-    height: 360px;
+    width: 56px;
+    height: 480px;
     display: flex;
     flex-direction: column;
-    border-radius: 8px;
+    border-radius: 10px;
     overflow: hidden;
     border: 1px solid #333;
   }
@@ -39,7 +39,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 11px;
+    font-size: 14px;
     color: #555;
     background: #1a1a1a;
     overflow: hidden;
@@ -47,7 +47,7 @@
   .ruler-seg:last-child { border-bottom: none; }
   .ruler-seg .fill {
     position: absolute;
-    bottom: 0;
+    top: 0;
     left: 0;
     width: 100%;
     height: 0%;
@@ -152,29 +152,4 @@ document.getElementById('alignDisplay').textContent = 'Hour ' + alignHour + ' an
 document.getElementById('realDisplay').textContent = 'Real time: ' + now.toLocaleTimeString();
 
 var currentSeg = alignHour + 1;
-var fillPct = (alignMin/120)*100;
-segs.forEach(function(s, idx){
-  var segNum = idx+1;
-  if (segNum < currentSeg) {
-    s.el.classList.add('complete');
-    s.fill.style.height = '100%';
-  } else if (segNum === currentSeg) {
-    s.el.classList.remove('complete');
-    s.fill.style.height = fillPct + '%';
-  } else {
-    s.el.classList.remove('complete');
-    s.fill.style.height = '0%';
-  }
-});
-}
-update();
-setInterval(update,1000);
-
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', function() {
-    navigator.serviceWorker.register('sw.js').catch(function(){});
-  });
-}
-</script>
-</body>
-</html>
+var fillPct
