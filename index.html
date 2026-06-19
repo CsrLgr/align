@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>CSR Align</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#c0b5a5">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #0d0d0d;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    font-family: Georgia, serif;
+  }
+  .watch-wrap { display:flex; flex-direction:column; align-items:center; padding:2rem; }
+  .watch-info { font-size:14px; color:#999; margin-top:1rem; letter-spacing:0.05em; }
+  .watch-val { font-size:20px; font-weight:500; color:#eee; margin-top:0.25rem; }
+  .real-time { font-size:13px; color:#666; margin-top:0.5rem; }
+</style>
+</head>
+<body>
+<div class="watch-wrap">
+<svg width="300" height="300" viewBox="0 0 300 300">
+<defs>
+<radialGradient id="fg" cx="45%" cy="38%" r="58%">
+<stop offset="0%" stop-color="#ffffff"/>
+<stop offset="100%" stop-color="#ede9e3"/>
+</radialGradient>
+</defs>
+<circle cx="150" cy="150" r="130" fill="#c0b5a5"/>
+<circle cx="150" cy="150" r="124" fill="#d0c8ba"/>
+<circle cx="150" cy="150" r="118" fill="#bab0a0"/>
+<circle cx="150" cy="150" r="112" fill="url(#fg)"/>
+<circle cx="150" cy="150" r="98" fill="none" stroke="#ddd8d0" stroke-width="0.75"/>
+<circle cx="150" cy="150" r="70" fill="none" stroke="#ddd8d0" stroke-width="0.75"/>
+<text x="150" y="134" text-anchor="middle" font-family="Georgia,serif" font-size="13" fill="#666" letter-spacing="2">CSR</text>
+<text x="150" y="152" text-anchor="middle" font-family="Georgia,serif" font-size="14" font-style="italic" fill="#555">Align</text>
+<g id="nums"></g>
+<line id="hand" x1="150" y1="150" x2="150" y2="80" stroke="#1a1a1a" stroke-width="3.5" stroke-linecap="round"/>
+<circle cx="150" cy="150" r="5" fill="#333"/>
+<circle cx="150" cy="150" r="2.5" fill="#999"/>
+</svg>
+<p class="watch-info">Alignment Time</p>
+<p class="watch-val" id="alignDisplay">—</p>
+<p class="real-time" id="realDisplay">—</p>
+</div>
+<script>
+var cx=150,cy=150;
+var pos=[{h:1,d:150},{h:2,d:210},{h:3,d:270},{h:4,d:330},{h:5,d:30},{h:6,d:90}];
+var g=document.getElementById('nums');
+pos.forEach(function(p){
+var r=p.d*Math.PI/180;
+var ox=cx+86*Math.cos(r),oy=cy+86*Math.sin(r);
+var ix=cx+58*Math.cos(r),iy=cy+58*Math.sin(r);
+var t1=document.createElementNS('http://www.w3.org/2000/svg','text');
+t1.setAttribute('x',ox);t1.setAttribute('y',oy);
+t1.setAttribute('text-anchor','middle');t1.setAttribute('dominant-baseline','central');
+t1.setAttribute('font-family','Georgia,serif');t1.setAttribute('font-size','13');t1.setAttribute('fill','#444');
+t1.textContent=p.h;g.appendChild(t1);
+var t2=document.createElementNS('http://www.w3.org/2000/svg','text');
+t2.setAttribute('x',ix);t2.setAttribute('y',iy);
+t2.setAttribute('text-anchor','middle');t2.setAttribute('dominant-baseline','central');
+t2.setAttribute('font-family','Georgia,serif');t2.setAttribute('font-size','11');t2.setAttribute('fill','#888');
+t2.textContent=p.h+6;g.appendChild(t2);
+});
+function update(){
+var now=new Date();
+var realMinutes = now.getHours()*60 + now.getMinutes() + now.getSeconds()/60;
+var sinceSix = (realMinutes - 360 + 1440) % 1440;
+var lap = sinceSix % 720;
+var isInner = sinceSix >= 720;
+var frac = lap/720;
+var deg = 90 + frac*360;
+var rad = deg*Math.PI/180;
+var handR = isInner?62:86;
+var hx=cx+handR*Math.cos(rad);
+var hy=cy+handR*Math.sin(rad);
+document.getElementById('hand').setAttribute('x2',hx);
+document.getElementById('hand').setAttribute('y2',hy);
+
+var alignHour = Math.floor(sinceSix/120);
+var alignMin = Math.floor(sinceSix%120);
+document.getElementById('alignDisplay').textContent = 'Hour ' + alignHour + ' and ' + alignMin + ' minutes';
+document.getElementById('realDisplay').textContent = 'Real time: ' + now.toLocaleTimeString();
+}
+update();
+setInterval(update,1000);
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('sw.js').catch(function(){});
+  });
+}
+</script>
+</body>
+</html>
