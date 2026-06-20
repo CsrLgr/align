@@ -1275,7 +1275,17 @@ function loadAndRenderClans() {
     });
 }
 
+var activeClanChannels = [];
+
+function cleanupClanChannels() {
+  activeClanChannels.forEach(function(ch) {
+    try { supabaseClient.removeChannel(ch); } catch (e) {}
+  });
+  activeClanChannels = [];
+}
+
 function renderClansList(clanRows) {
+  cleanupClanChannels();
   clansListEl.innerHTML = '';
   clanRows.forEach(function(clan) {
     renderOneClanCard(clan);
@@ -1347,12 +1357,21 @@ function renderOneClanCard(clan) {
         });
     });
 
-  // Live updates: whenever anyone's shared ruler changes, re-render this clan
-  supabaseClient.channel('clan-' + clan.id)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'shared_rulers' }, function() {
-      renderOneClanCardRefresh(clan, membersWrap);
-    })
-    .subscribe();
+  // Live updates: whenever anyone's shared ruler changes, re-render this clan.
+  // Wrapped defensively so one channel failing can never block other clans
+  // from rendering (a real bug we hit: an uncaught subscribe error here
+  // was silently stopping the whole render loop for every clan after it).
+  try {
+    var channel = supabaseClient.channel('clan-' + clan.id + '-' + Date.now())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shared_rulers' }, function() {
+        renderOneClanCardRefresh(clan, membersWrap);
+      })
+      .subscribe();
+    activeClanChannels.push(channel);
+  } catch (e) {
+    // Live updates for this clan won't work, but the card itself
+    // still rendered above, so the rest of the UI is unaffected.
+  }
 }
 
 function renderOneClanCardRefresh(clan, membersWrap) {
