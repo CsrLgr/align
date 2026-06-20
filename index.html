@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>My Ruler</title>
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#c0b5a5">
+<meta name="theme-color" content="#2f3b34">
 <style>
   * { box-sizing: border-box; }
   body {
@@ -14,8 +14,14 @@
     min-height: 100vh;
     font-family: Georgia, serif;
     color: #eee;
-    padding: 2rem 1.5rem;
+    padding: 2rem 1rem;
   }
+  .page-wrap {
+    position: relative;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
   .header { text-align: center; margin-bottom: 0.5rem; }
   .header h1 { font-size: 28px; margin: 0; color: #eee; }
   .header p { font-size: 14px; color: #999; margin-top: 0.4rem; }
@@ -45,18 +51,41 @@
 
   .ruler-container {
     max-width: 1100px;
-    margin: 2rem auto 0.4rem auto;
+    margin: 2rem auto 1.5rem auto;
   }
 
-  /* 24-hour span markers above the track */
+  /* Sunrise / Sunset / 24h span markers above the track */
   .span-markers {
     display: flex;
-    justify-content: space-between;
     font-size: 10px;
-    color: #777;
+    color: #888;
     letter-spacing: 0.05em;
-    margin-bottom: 4px;
+    margin-bottom: 10px;
     padding: 0 1px;
+    position: relative;
+    height: 28px;
+  }
+  .span-markers .marker-start {
+    position: absolute;
+    left: 0;
+    text-align: left;
+  }
+  .span-markers .marker-mid {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+  }
+  .span-markers .marker-end {
+    position: absolute;
+    right: 0;
+    text-align: right;
+  }
+  .span-markers .marker-sub {
+    display: block;
+    color: #555;
+    font-size: 9px;
+    margin-top: 2px;
   }
 
   .ruler-track {
@@ -68,11 +97,12 @@
     border: 1px solid #333;
     position: relative;
     user-select: none;
+    touch-action: none;
   }
 
   .ruler-block {
     position: relative;
-    background: #1f1f1f;
+    background: #2f3b34;
     border-right: 1px solid #000;
     display: flex;
     flex-direction: column;
@@ -100,9 +130,10 @@
   }
   .ruler-block .block-mins {
     font-size: 10px;
-    color: #888;
+    color: #aab;
     margin-top: 2px;
   }
+  .ruler-block.sleep-zone .block-mins { color: #c99; }
 
   .ruler-block .fill-overlay {
     position: absolute;
@@ -110,49 +141,66 @@
     left: 0;
     height: 100%;
     width: 0%;
-    background: rgba(192,181,165,0.25);
+    background: rgba(255,255,255,0.15);
     pointer-events: none;
   }
 
+  /* Resize handles: wider invisible hit-area on touch, thin visible line */
   .resize-handle {
     position: absolute;
     top: 0;
-    right: -3px;
-    width: 7px;
+    right: -12px;
+    width: 24px;
     height: 100%;
     cursor: col-resize;
     z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
-  .resize-handle:hover { background: rgba(255,255,255,0.15); }
+  .resize-handle::after {
+    content: '';
+    width: 3px;
+    height: 36px;
+    background: rgba(255,255,255,0.25);
+    border-radius: 2px;
+  }
+  .resize-handle:hover::after,
+  .resize-handle.dragging::after { background: #c0b5a5; }
 
-  /* Sleep toggle button in the corner of each block */
+  /* Do-not-disturb icon toggle, top-right corner of each block */
   .sleep-toggle {
     position: absolute;
-    top: 3px;
-    right: 3px;
-    width: 16px;
-    height: 16px;
+    top: 4px;
+    right: 4px;
+    width: 20px;
+    height: 20px;
     border-radius: 50%;
-    border: 1px solid #555;
+    border: 1.5px solid #666;
     background: rgba(0,0,0,0.35);
-    color: #999;
-    font-size: 9px;
-    line-height: 14px;
-    text-align: center;
     cursor: pointer;
     z-index: 6;
     user-select: none;
   }
-  .sleep-toggle:hover { border-color: #c0b5a5; color: #c0b5a5; }
-  .ruler-block.sleep-zone .sleep-toggle {
-    border-color: #c0b5a5;
-    color: #c0b5a5;
-    background: rgba(0,0,0,0.45);
+  .sleep-toggle::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 12%;
+    right: 12%;
+    height: 1.5px;
+    background: #777;
+    transform: rotate(45deg);
+    transform-origin: center;
   }
+  .sleep-toggle:hover { border-color: #c0b5a5; }
+  .sleep-toggle:hover::after { background: #c0b5a5; }
+  .ruler-block.sleep-zone .sleep-toggle { border-color: #e8b4b4; background: rgba(0,0,0,0.45); }
+  .ruler-block.sleep-zone .sleep-toggle::after { background: #e8b4b4; }
 
   .current-block-info {
     max-width: 1100px;
-    margin: 0 auto 0.5rem auto;
+    margin: 0 auto 1.5rem auto;
     display: flex;
     justify-content: space-between;
     align-items: baseline;
@@ -160,23 +208,25 @@
   .current-block-info .cb-name { font-size: 16px; color: #c0b5a5; }
   .current-block-info .cb-time { font-size: 13px; color: #888; }
 
-  /* Totals row: minutes + % of day asleep */
-  .totals-row {
+  /* Two-column area: Journal Notes (left, slightly smaller/personal) + Musts & In-between (right) */
+  .panels-row {
     max-width: 1100px;
-    margin: 0 auto 2rem auto;
-    display: flex;
-    justify-content: space-between;
-    font-size: 12px;
-    color: #888;
-    border-top: 1px solid #2a2a2a;
-    padding-top: 0.5rem;
-  }
-  .totals-row .totals-label { color: #c0b5a5; }
-
-  .work-area {
-    max-width: 550px;
     margin: 0 auto;
+    display: flex;
+    gap: 1.25rem;
+    flex-wrap: wrap;
+    align-items: flex-start;
   }
+  .panel-col-notes {
+    flex: 1 1 320px;
+    min-width: 260px;
+  }
+  .panel-col-musts {
+    flex: 0 1 240px;
+    width: 240px;
+    min-width: 220px;
+  }
+
   textarea {
     width: 100%;
     min-height: 110px;
@@ -193,8 +243,7 @@
 
   .btn-row { display: flex; gap: 0.6rem; margin-top: 0.75rem; }
   button {
-    flex: 1;
-    padding: 0.6rem 0.5rem;
+    padding: 0.55rem 1rem;
     border: none;
     border-radius: 6px;
     background: #c0b5a5;
@@ -207,10 +256,88 @@
   button:hover { background: #d0c5b5; }
   button.secondary { background: #2a2a2a; color: #ccc; }
   button.secondary:hover { background: #3a3a3a; }
+  button.combo-btn { margin: 0 auto; display: block; }
+
+  /* Musts & In-between — a quiet plain-text reminder list, no checkboxes */
+  .musts-box {
+    background: #161616;
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    padding: 0.75rem;
+    min-height: 90px;
+  }
+  .must-item {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    padding: 0.35rem 0.1rem;
+    font-size: 12px;
+    color: #bbb;
+    border-bottom: 1px solid #232323;
+  }
+  .must-item:last-child { border-bottom: none; }
+  .must-item .must-label { flex: 1; }
+  .must-item .must-note { font-size: 10px; color: #666; }
+  .must-add-row { display: flex; gap: 0.4rem; margin-top: 0.5rem; }
+  .must-add-row input[type="text"] {
+    flex: 1;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 6px;
+    color: #eee;
+    font-family: Georgia, serif;
+    font-size: 12px;
+    padding: 0.45rem 0.6rem;
+  }
+  .must-add-row input[type="text"]:focus { outline: 1px solid #c0b5a5; }
+  .must-add-row button { padding: 0.45rem 0.8rem; }
+  .must-remove {
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 0 0.2rem;
+    flex: 0;
+  }
+  .must-remove:hover { color: #c77; background: none; }
+
+  /* Tackle / Whiteboard box, fixed top right corner of page-wrap */
+  .tackle-wrap {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 10;
+  }
+  .tackle-box {
+    width: 240px;
+    background: #161616;
+    border: 1px solid #3a3327;
+    border-radius: 8px;
+    padding: 0.75rem;
+  }
+  .tackle-box .section-label { font-size: 11px; margin-bottom: 0.4rem; }
+  .tackle-box textarea {
+    min-height: 80px;
+    font-size: 12px;
+    padding: 0.6rem;
+  }
+  .tackle-share-row {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-top: 0.5rem;
+    font-size: 11px;
+    color: #888;
+  }
+  .tackle-share-row input[type="checkbox"] {
+    accent-color: #c0b5a5;
+    cursor: pointer;
+  }
 
   .entries-list {
-    max-width: 550px;
-    margin: 1.5rem auto 0 auto;
+    max-width: 1100px;
+    margin: 2rem auto 0 auto;
   }
   .entry-item {
     background: #161616;
@@ -221,24 +348,57 @@
   }
   .entry-date { font-size: 11px; color: #c0b5a5; margin-bottom: 0.4rem; }
   .entry-text { font-size: 12px; color: #ccc; white-space: pre-wrap; }
+
+  /* Phase 2 placeholder */
+  .clans-box {
+    max-width: 1100px;
+    margin: 2.5rem auto 0 auto;
+    border: 1px dashed #333;
+    border-radius: 8px;
+    padding: 1.25rem;
+    text-align: center;
+    color: #666;
+    font-size: 12px;
+  }
+
+  @media (max-width: 700px) {
+    body { padding: 1.25rem 0.75rem; }
+    .tackle-wrap { position: static; display: flex; justify-content: center; margin-bottom: 1rem; }
+    .tackle-box { width: 100%; max-width: 280px; }
+    .resize-handle { right: -14px; width: 28px; }
+  }
 </style>
 </head>
 <body>
 
-<div class="header">
-  <h1>My Ruler</h1>
-  <p>Your 12-block day planner</p>
-  <div class="live-clock" id="liveClock">—</div>
+<div class="page-wrap">
+  <div class="header">
+    <h1>My Ruler</h1>
+    <p>Your 12-block day planner</p>
+    <div class="live-clock" id="liveClock">—</div>
+  </div>
+
+  <div class="tackle-wrap">
+    <div class="tackle-box">
+      <span class="section-label">Tackle — Whiteboard</span>
+      <textarea id="tackleArea" placeholder="Jot a quick reminder..."></textarea>
+      <div class="tackle-share-row">
+        <input type="checkbox" id="tackleShare">
+        <label for="tackleShare">Share</label>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="ruler-container">
   <div class="progress-row">
-    <span class="section-label">Today's Schedule</span>
-    <span class="progress-pct" id="dayProgress">0% of day elapsed</span>
+    <span class="section-label">Today's Ruler</span>
+    <span class="progress-pct" id="dayProgress">0% elapsed</span>
   </div>
   <div class="span-markers">
-    <span>6:00 AM</span>
-    <span>6:00 AM (+24h)</span>
+    <span class="marker-start">Sunrise<span class="marker-sub">6:00 AM</span></span>
+    <span class="marker-mid">Sunset<span class="marker-sub">≈ Block 6</span></span>
+    <span class="marker-end">+24h</span>
   </div>
   <div class="ruler-track" id="rulerTrack"></div>
 </div>
@@ -248,23 +408,28 @@
   <span class="cb-time" id="currentBlockTime">—</span>
 </div>
 
-<div class="totals-row">
-  <span><span class="totals-label">Sleep:</span> <span id="sleepTotal">0 min</span></span>
-  <span><span class="totals-label">% of day asleep:</span> <span id="sleepPct">0%</span></span>
-</div>
+<div class="panels-row">
+  <div class="panel-col-notes">
+    <span class="section-label">Journal Notes</span>
+    <textarea id="workArea" placeholder="Write your day here..."></textarea>
+    <div class="btn-row" style="justify-content:center;">
+      <button id="saveBtn" class="combo-btn">Save Entry / New Day</button>
+    </div>
+  </div>
 
-<div class="work-area">
-  <span class="section-label">Today's Notes</span>
-  <textarea id="workArea" placeholder="Write your day here..."></textarea>
-  <div class="btn-row">
-    <button id="saveBtn">Save Entry</button>
-    <button id="newDayBtn" class="secondary">New Day</button>
+  <div class="panel-col-musts">
+    <span class="section-label">Musts &amp; In-between</span>
+    <div class="musts-box" id="mustsBox"></div>
   </div>
 </div>
 
 <div class="entries-list">
   <span class="section-label">Past Entries</span>
   <div id="entriesList"></div>
+</div>
+
+<div class="clans-box">
+  Clans (team setup) — coming in Phase 2
 </div>
 
 <script>
@@ -276,6 +441,8 @@ var DAY_START_OFFSET = 360; // 6am reference
 var STORAGE_KEY = 'csrAlignBlocks';
 var ENTRIES_KEY = 'csrAlignEntries';
 var TODAY_KEY = 'csrAlignTodayEntry';
+var MUSTS_KEY = 'csrAlignMusts';
+var TACKLE_KEY = 'csrAlignTackle';
 
 // ---- Load or initialize block data ----
 // Each block: { name, minutes, sleep: true/false }
@@ -285,7 +452,6 @@ function loadBlocks() {
     try {
       var parsed = JSON.parse(saved);
       if (parsed.length === NUM_BLOCKS) {
-        // migrate older entries that don't have a "sleep" flag yet
         parsed.forEach(function(b) { if (typeof b.sleep === 'undefined') b.sleep = false; });
         return parsed;
       }
@@ -342,6 +508,7 @@ function renderRuler() {
       if (e.key === 'Enter') { e.preventDefault(); nameSpan.blur(); }
     });
     nameSpan.addEventListener('mousedown', function(e){ e.stopPropagation(); });
+    nameSpan.addEventListener('touchstart', function(e){ e.stopPropagation(); });
 
     var minsSpan = document.createElement('div');
     minsSpan.className = 'block-mins';
@@ -352,9 +519,9 @@ function renderRuler() {
 
     var sleepToggle = document.createElement('div');
     sleepToggle.className = 'sleep-toggle';
-    sleepToggle.textContent = '💤';
-    sleepToggle.title = b.sleep ? 'Marked as sleep — click to unmark' : 'Mark as sleep block';
+    sleepToggle.title = b.sleep ? 'Marked as sleep — tap to unmark' : 'Mark as sleep block';
     sleepToggle.addEventListener('mousedown', function(e){ e.stopPropagation(); });
+    sleepToggle.addEventListener('touchstart', function(e){ e.stopPropagation(); }, {passive: true});
     sleepToggle.addEventListener('click', function(e) {
       e.stopPropagation();
       blocks[idx].sleep = !blocks[idx].sleep;
@@ -380,17 +547,9 @@ function renderRuler() {
   });
 
   attachDragHandlers();
-  updateSleepTotals();
 }
 
-function updateSleepTotals() {
-  var sleepMin = 0;
-  blocks.forEach(function(b) { if (b.sleep) sleepMin += b.minutes; });
-  document.getElementById('sleepTotal').textContent = Math.round(sleepMin) + ' min';
-  document.getElementById('sleepPct').textContent = Math.round((sleepMin / TOTAL_MIN) * 100) + '%';
-}
-
- // ---- Drag to resize adjacent blocks ----
+ // ---- Drag to resize adjacent blocks (mouse + touch, full-track friendly) ----
 var MIN_BLOCK_MIN = 10;
 
 function attachDragHandlers() {
@@ -399,16 +558,18 @@ function attachDragHandlers() {
     handle.addEventListener('mousedown', function(e) {
       e.preventDefault();
       var idx = parseInt(handle.dataset.idx);
-      startDrag(idx, e.clientX);
+      startDrag(idx, e.clientX, handle);
     });
     handle.addEventListener('touchstart', function(e) {
+      e.preventDefault();
       var idx = parseInt(handle.dataset.idx);
-      startDrag(idx, e.touches[0].clientX);
-    });
+      startDrag(idx, e.touches[0].clientX, handle);
+    }, {passive: false});
   });
 }
 
-function startDrag(idx, startX) {
+function startDrag(idx, startX, handleEl) {
+  handleEl.classList.add('dragging');
   var trackRect = rulerTrack.getBoundingClientRect();
   var trackWidthPx = trackRect.width;
   var minPerPx = TOTAL_MIN / trackWidthPx;
@@ -442,7 +603,7 @@ function startDrag(idx, startX) {
   }
 
   function mouseMoveHandler(e) { onMove(e.clientX); }
-  function touchMoveHandler(e) { onMove(e.touches[0].clientX); }
+  function touchMoveHandler(e) { e.preventDefault(); onMove(e.touches[0].clientX); }
   function endHandler() {
     document.removeEventListener('mousemove', mouseMoveHandler);
     document.removeEventListener('mouseup', endHandler);
@@ -453,7 +614,7 @@ function startDrag(idx, startX) {
 
   document.addEventListener('mousemove', mouseMoveHandler);
   document.addEventListener('mouseup', endHandler);
-  document.addEventListener('touchmove', touchMoveHandler);
+  document.addEventListener('touchmove', touchMoveHandler, {passive: false});
   document.addEventListener('touchend', endHandler);
 }
 
@@ -509,9 +670,10 @@ function updateLive() {
   updateCurrentBlockInfo();
 
   var dayPct = (sinceSix / TOTAL_MIN) * 100;
-  document.getElementById('dayProgress').textContent = Math.round(dayPct) + '% of day elapsed';
+  document.getElementById('dayProgress').textContent = Math.round(dayPct) + '% elapsed';
 }
 
+// ---- Journal entries ----
 function loadEntries() {
   var saved = localStorage.getItem(ENTRIES_KEY);
   if (saved) {
@@ -555,17 +717,9 @@ function saveTodayDraft() {
 
 workArea.addEventListener('input', saveTodayDraft);
 
+// Combined Save Entry / New Day button
 document.getElementById('saveBtn').addEventListener('click', function() {
   saveTodayDraft();
-  var entries = loadEntries();
-  var today = new Date();
-  var dateStr = today.toLocaleDateString() + ' ' + today.toLocaleTimeString();
-  entries.push({ date: dateStr, text: workArea.value });
-  saveEntries(entries);
-  renderEntries();
-});
-
-document.getElementById('newDayBtn').addEventListener('click', function() {
   if (workArea.value.trim()) {
     var entries = loadEntries();
     var today = new Date();
@@ -578,9 +732,117 @@ document.getElementById('newDayBtn').addEventListener('click', function() {
   localStorage.removeItem(TODAY_KEY);
 });
 
+// ---- Musts & In-between checklist ----
+var DEFAULT_MUSTS = [
+  { id: 'sleep', label: 'Sleep', note: 'recommended 420 min', fixed: true },
+  { id: 'sunlight', label: 'Sunlight', note: '', fixed: true },
+  { id: 'exercise', label: 'Exercise', note: '', fixed: true }
+];
+
+function loadMusts() {
+  var saved = localStorage.getItem(MUSTS_KEY);
+  if (saved) {
+    try {
+      var parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length) {
+        // migrate: drop the retired "Eat right" fixed item if present from an earlier version
+        parsed = parsed.filter(function(m) { return m.id !== 'eat'; });
+        return parsed;
+      }
+    } catch(e) {}
+  }
+  return DEFAULT_MUSTS.map(function(m){ return Object.assign({}, m); });
+}
+
+function saveMusts() {
+  localStorage.setItem(MUSTS_KEY, JSON.stringify(musts));
+}
+
+var musts = loadMusts();
+var mustsBox = document.getElementById('mustsBox');
+
+function renderMusts() {
+  mustsBox.innerHTML = '';
+  musts.forEach(function(m, idx) {
+    var row = document.createElement('div');
+    row.className = 'must-item';
+
+    var label = document.createElement('span');
+    label.className = 'must-label';
+    label.textContent = m.label;
+    row.appendChild(label);
+
+    if (m.note) {
+      var note = document.createElement('span');
+      note.className = 'must-note';
+      note.textContent = m.note;
+      row.appendChild(note);
+    }
+
+    if (!m.fixed) {
+      var rm = document.createElement('button');
+      rm.className = 'must-remove';
+      rm.textContent = '✕';
+      rm.title = 'Remove';
+      rm.addEventListener('click', function() {
+        musts.splice(idx, 1);
+        saveMusts();
+        renderMusts();
+      });
+      row.appendChild(rm);
+    }
+
+    mustsBox.appendChild(row);
+  });
+
+  var addRow = document.createElement('div');
+  addRow.className = 'must-add-row';
+  var input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = 'Add another...';
+  var addBtn = document.createElement('button');
+  addBtn.textContent = '+';
+  function addMust() {
+    var val = input.value.trim();
+    if (!val) return;
+    musts.push({ id: 'custom-' + Date.now(), label: val, note: '', fixed: false });
+    saveMusts();
+    renderMusts();
+  }
+  addBtn.addEventListener('click', addMust);
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); addMust(); }
+  });
+  addRow.appendChild(input);
+  addRow.appendChild(addBtn);
+  mustsBox.appendChild(addRow);
+}
+
+// ---- Tackle / Whiteboard ----
+var tackleArea = document.getElementById('tackleArea');
+var tackleShare = document.getElementById('tackleShare');
+
+function loadTackle() {
+  var saved = localStorage.getItem(TACKLE_KEY);
+  if (saved) {
+    try {
+      var parsed = JSON.parse(saved);
+      tackleArea.value = parsed.text || '';
+      tackleShare.checked = !!parsed.shared;
+    } catch(e) {}
+  }
+}
+function saveTackle() {
+  localStorage.setItem(TACKLE_KEY, JSON.stringify({ text: tackleArea.value, shared: tackleShare.checked }));
+}
+tackleArea.addEventListener('input', saveTackle);
+tackleShare.addEventListener('change', saveTackle);
+
 renderRuler();
 loadTodayDraft();
 renderEntries();
+renderMusts();
+loadTackle();
 updateLive();
 setInterval(updateLive, 1000);
 
