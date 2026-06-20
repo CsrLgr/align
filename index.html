@@ -6,6 +6,7 @@
 <title>My Ruler</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#2f3b34">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
   * { box-sizing: border-box; }
   body {
@@ -20,6 +21,41 @@
     position: relative;
     max-width: 1100px;
     margin: 0 auto;
+  }
+
+  /* Thin auth bar above everything else. Logged-out: email + send link.
+     Logged-in: greeting + sign out. Never blocks the rest of the page. */
+  .auth-bar {
+    max-width: 1100px;
+    margin: 0 auto 1.25rem auto;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 12px;
+    color: #888;
+  }
+  .auth-bar input[type="email"] {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 6px;
+    color: #eee;
+    font-family: Georgia, serif;
+    font-size: 12px;
+    padding: 0.4rem 0.6rem;
+    width: 190px;
+  }
+  .auth-bar input[type="email"]:focus { outline: 1px solid #c0b5a5; }
+  .auth-bar button {
+    padding: 0.4rem 0.8rem;
+    font-size: 11px;
+  }
+  .auth-bar .auth-status {
+    color: #c0b5a5;
+  }
+  .auth-bar .auth-msg {
+    color: #7a9b7a;
+    font-size: 11px;
   }
 
   .header { text-align: center; margin-bottom: 0.5rem; }
@@ -370,6 +406,10 @@
 </style>
 </head>
 <body>
+
+<div class="auth-bar" id="authBar">
+  <!-- Filled in by JS depending on logged-in/out state -->
+</div>
 
 <div class="page-wrap">
   <div class="header">
@@ -837,6 +877,128 @@ function saveTackle() {
 }
 tackleArea.addEventListener('input', saveTackle);
 tackleShare.addEventListener('change', saveTackle);
+
+// ============================================================
+// Supabase auth — magic link login (additive only, never blocks
+// the Ruler/Journal/Tackle for logged-out visitors)
+// ============================================================
+var SUPABASE_URL = 'https://dctsxztgwwgbedeyqpee.supabase.co';
+var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjdHN4enRnd3dnYmVkZXlxcGVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NjY2NDAsImV4cCI6MjA5NzU0MjY0MH0.XW2hP-u530HuN0TBxL6OiufPfswNi0i0Q8fgtOeNWG8';
+
+var supabaseClient = null;
+if (window.supabase) {
+  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
+
+var authBar = document.getElementById('authBar');
+
+function renderAuthBarLoggedOut(message) {
+  authBar.innerHTML = '';
+
+  var emailInput = document.createElement('input');
+  emailInput.type = 'email';
+  emailInput.placeholder = 'your@email.com';
+  emailInput.id = 'authEmailInput';
+
+  var sendBtn = document.createElement('button');
+  sendBtn.textContent = 'Send magic link';
+  sendBtn.addEventListener('click', function() {
+    sendMagicLink(emailInput.value.trim());
+  });
+  emailInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); sendMagicLink(emailInput.value.trim()); }
+  });
+
+  authBar.appendChild(emailInput);
+  authBar.appendChild(sendBtn);
+
+  if (message) {
+    var msg = document.createElement('span');
+    msg.className = 'auth-msg';
+    msg.textContent = message;
+    authBar.appendChild(msg);
+  }
+}
+
+function renderAuthBarLoggedIn(email) {
+  authBar.innerHTML = '';
+
+  var status = document.createElement('span');
+  status.className = 'auth-status';
+  status.textContent = 'Signed in as ' + email;
+
+  var signOutBtn = document.createElement('button');
+  signOutBtn.className = 'secondary';
+  signOutBtn.textContent = 'Sign out';
+  signOutBtn.addEventListener('click', function() {
+    if (supabaseClient) supabaseClient.auth.signOut();
+    renderAuthBarLoggedOut();
+  });
+
+  authBar.appendChild(status);
+  authBar.appendChild(signOutBtn);
+}
+
+function sendMagicLink(email) {
+  if (!supabaseClient) {
+    renderAuthBarLoggedOut('Login is temporarily unavailable.');
+    return;
+  }
+  if (!email || email.indexOf('@') === -1) {
+    renderAuthBarLoggedOut('Enter a valid email first.');
+    return;
+  }
+
+  supabaseClient.auth.signInWithOtp({
+    email: email,
+    options: { emailRedirectTo: window.location.href }
+  }).then(function(result) {
+    if (result.error) {
+      renderAuthBarLoggedOut('Could not send link: ' + result.error.message);
+    } else {
+      renderAuthBarLoggedOut('Check your email for the link!');
+    }
+  });
+}
+
+function initAuth() {
+  if (!supabaseClient) {
+    renderAuthBarLoggedOut();
+    return;
+  }
+
+  supabaseClient.auth.getSession().then(function(result) {
+    var session = result.data && result.data.session;
+    if (session && session.user) {
+      renderAuthBarLoggedIn(session.user.email);
+      ensureProfileTimezone(session.user);
+    } else {
+      renderAuthBarLoggedOut();
+    }
+  });
+
+  supabaseClient.auth.onAuthStateChange(function(event, session) {
+    if (session && session.user) {
+      renderAuthBarLoggedIn(session.user.email);
+      ensureProfileTimezone(session.user);
+    } else {
+      renderAuthBarLoggedOut();
+    }
+  });
+}
+
+// Make sure each profile has the browser's real timezone on file,
+// so Clan views can later show each member's local time correctly.
+function ensureProfileTimezone(user) {
+  if (!supabaseClient) return;
+  var tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  supabaseClient.from('profiles')
+    .update({ timezone: tz })
+    .eq('id', user.id)
+    .then(function(){});
+}
+
+initAuth();
 
 renderRuler();
 loadTodayDraft();
