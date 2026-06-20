@@ -371,9 +371,18 @@
     cursor: pointer;
   }
 
-  .entries-list {
+  .bottom-row {
     max-width: 1100px;
     margin: 2rem auto 0 auto;
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .entries-list {
+    flex: 1 1 380px;
+    min-width: 280px;
   }
   .entry-item {
     background: #161616;
@@ -385,16 +394,126 @@
   .entry-date { font-size: 11px; color: #c0b5a5; margin-bottom: 0.4rem; }
   .entry-text { font-size: 12px; color: #ccc; white-space: pre-wrap; }
 
-  /* Phase 2 placeholder */
-  .clans-box {
-    max-width: 1100px;
-    margin: 2.5rem auto 0 auto;
-    border: 1px dashed #333;
+  .clans-col {
+    flex: 1 1 380px;
+    min-width: 280px;
+  }
+
+  /* ---- Clans (Phase 2) ---- */
+  .clans-section {
+    background: #161616;
+    border: 1px solid #2a2a2a;
     border-radius: 8px;
-    padding: 1.25rem;
-    text-align: center;
-    color: #666;
+    padding: 1rem;
+  }
+  .clans-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+  .clans-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  .clans-actions input[type="text"] {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 6px;
+    color: #eee;
+    font-family: Georgia, serif;
     font-size: 12px;
+    padding: 0.45rem 0.6rem;
+    width: 130px;
+  }
+  .clans-actions input[type="text"]:focus { outline: 1px solid #c0b5a5; }
+  .clans-actions button { padding: 0.45rem 0.8rem; font-size: 11px; white-space: nowrap; }
+
+  .clans-msg {
+    font-size: 12px;
+    color: #7a9b7a;
+    margin-bottom: 0.75rem;
+    min-height: 1em;
+  }
+  .clans-msg.error { color: #c77; }
+
+  .clan-card {
+    background: #161616;
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1.25rem;
+  }
+  .clan-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 0.75rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .clan-card-header .clan-name { font-size: 16px; color: #c0b5a5; }
+  .clan-card-header .clan-meta { font-size: 11px; color: #777; }
+  .clan-card-header .clan-leave {
+    background: none;
+    border: 1px solid #444;
+    color: #888;
+    font-size: 10px;
+    padding: 0.3rem 0.6rem;
+  }
+  .clan-card-header .clan-leave:hover { border-color: #c77; color: #c77; }
+
+  .clan-member {
+    margin-bottom: 1rem;
+  }
+  .clan-member:last-child { margin-bottom: 0; }
+  .clan-member-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 0.35rem;
+  }
+  .clan-member-name { font-size: 13px; color: #ddd; }
+  .clan-member-time { font-size: 12px; color: #999; font-variant-numeric: tabular-nums; }
+  .clan-member-time.is-night { color: #555; }
+
+  .clan-mini-track {
+    display: flex;
+    width: 100%;
+    height: 28px;
+    border-radius: 5px;
+    overflow: hidden;
+    border: 1px solid #2a2a2a;
+  }
+  .clan-mini-block {
+    background: #2f3b34;
+    border-right: 1px solid #000;
+    position: relative;
+  }
+  .clan-mini-block:last-child { border-right: none; }
+  .clan-mini-block.sleep-zone { background: #5a2323; }
+  .clan-mini-block .mini-fill {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 100%;
+    width: 0%;
+    background: rgba(255,255,255,0.15);
+  }
+
+  .clans-locked {
+    background: #161616;
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    padding: 1rem;
+  }
+  .clans-locked p {
+    font-size: 12px;
+    color: #666;
+    margin-top: 0.5rem;
   }
 
   @media (max-width: 700px) {
@@ -402,6 +521,7 @@
     .tackle-wrap { position: static; display: flex; justify-content: center; margin-bottom: 1rem; }
     .tackle-box { width: 100%; max-width: 280px; }
     .resize-handle { right: -14px; width: 28px; }
+    .clans-actions input[type="text"] { width: 100px; }
   }
 </style>
 </head>
@@ -463,13 +583,31 @@
   </div>
 </div>
 
-<div class="entries-list">
-  <span class="section-label">Past Entries</span>
-  <div id="entriesList"></div>
-</div>
+<div class="bottom-row">
+  <div class="entries-list">
+    <span class="section-label">Past Entries</span>
+    <div id="entriesList"></div>
+  </div>
 
-<div class="clans-box">
-  Clans (team setup) — coming in Phase 2
+  <div class="clans-col">
+    <div class="clans-section" id="clansSection" style="display:none;">
+      <div class="clans-header-row">
+        <span class="section-label">Clans</span>
+        <div class="clans-actions">
+          <input type="text" id="joinCodeInput" placeholder="Invite code">
+          <button id="joinClanBtn" class="secondary">Join</button>
+          <button id="createClanBtn">+ Create Clan</button>
+        </div>
+      </div>
+      <div class="clans-msg" id="clansMsg"></div>
+      <div id="clansList"></div>
+    </div>
+
+    <div class="clans-locked" id="clansLocked">
+      <span class="section-label">Clans</span>
+      <p>Sign in above to join or create a Clan and see your team's Rulers.</p>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -506,6 +644,8 @@ function loadBlocks() {
 
 function saveBlocks() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(blocks));
+  // If logged in, push the update live so clan members see it instantly.
+  if (typeof pushMyRulerToSupabase === 'function') pushMyRulerToSupabase();
 }
 
 var blocks = loadBlocks();
@@ -964,6 +1104,7 @@ function sendMagicLink(email) {
 function initAuth() {
   if (!supabaseClient) {
     renderAuthBarLoggedOut();
+    showClansLocked();
     return;
   }
 
@@ -972,8 +1113,13 @@ function initAuth() {
     if (session && session.user) {
       renderAuthBarLoggedIn(session.user.email);
       ensureProfileTimezone(session.user);
+      currentUser = session.user;
+      showClansUnlocked();
+      loadAndRenderClans();
+      pushMyRulerToSupabase();
     } else {
       renderAuthBarLoggedOut();
+      showClansLocked();
     }
   });
 
@@ -981,8 +1127,14 @@ function initAuth() {
     if (session && session.user) {
       renderAuthBarLoggedIn(session.user.email);
       ensureProfileTimezone(session.user);
+      currentUser = session.user;
+      showClansUnlocked();
+      loadAndRenderClans();
+      pushMyRulerToSupabase();
     } else {
+      currentUser = null;
       renderAuthBarLoggedOut();
+      showClansLocked();
     }
   });
 }
@@ -999,6 +1151,289 @@ function ensureProfileTimezone(user) {
 }
 
 initAuth();
+
+// ============================================================
+// Clans — create, join, view live member rulers
+// (Journal entries are never part of this. Only block layout.)
+// ============================================================
+var currentUser = null;
+var clansSection = document.getElementById('clansSection');
+var clansLocked = document.getElementById('clansLocked');
+var clansMsgEl = document.getElementById('clansMsg');
+var clansListEl = document.getElementById('clansList');
+
+function showClansUnlocked() {
+  clansSection.style.display = '';
+  clansLocked.style.display = 'none';
+}
+function showClansLocked() {
+  clansSection.style.display = 'none';
+  clansLocked.style.display = '';
+}
+
+function showClansMsg(text, isError) {
+  clansMsgEl.textContent = text || '';
+  clansMsgEl.className = 'clans-msg' + (isError ? ' error' : '');
+}
+
+// Push this person's current Ruler blocks up to Supabase so clan
+// members can see it live. Called whenever blocks change.
+function pushMyRulerToSupabase() {
+  if (!supabaseClient || !currentUser) return;
+  supabaseClient.from('shared_rulers')
+    .upsert({ user_id: currentUser.id, blocks: blocks, updated_at: new Date().toISOString() })
+    .then(function(){});
+}
+
+document.getElementById('createClanBtn').addEventListener('click', function() {
+  if (!supabaseClient || !currentUser) return;
+  var name = window.prompt('Name this clan:');
+  if (!name || !name.trim()) return;
+
+  supabaseClient.from('clans')
+    .insert({ name: name.trim(), owner_id: currentUser.id })
+    .select()
+    .then(function(result) {
+      if (result.error) {
+        if (result.error.message.indexOf('row-level security') !== -1 || result.error.code === '42501') {
+          showClansMsg('Creating clans is a paid feature. Upgrade to create your own.', true);
+        } else {
+          showClansMsg('Could not create clan: ' + result.error.message, true);
+        }
+        return;
+      }
+      var newClan = result.data && result.data[0];
+      if (newClan) {
+        // Owner auto-joins their own clan
+        supabaseClient.from('clan_members')
+          .insert({ clan_id: newClan.id, user_id: currentUser.id })
+          .then(function() {
+            showClansMsg('Clan "' + newClan.name + '" created! Invite code: ' + newClan.invite_code);
+            loadAndRenderClans();
+          });
+      }
+    });
+});
+
+document.getElementById('joinClanBtn').addEventListener('click', function() {
+  if (!supabaseClient || !currentUser) return;
+  var code = document.getElementById('joinCodeInput').value.trim();
+  if (!code) { showClansMsg('Enter an invite code first.', true); return; }
+
+  supabaseClient.from('clans')
+    .select('id, name')
+    .eq('invite_code', code)
+    .then(function(result) {
+      if (result.error || !result.data || !result.data.length) {
+        showClansMsg('No clan found with that code.', true);
+        return;
+      }
+      var clan = result.data[0];
+      supabaseClient.from('clan_members')
+        .insert({ clan_id: clan.id, user_id: currentUser.id })
+        .then(function(insertResult) {
+          if (insertResult.error) {
+            if (insertResult.error.message.indexOf('Free tier') !== -1) {
+              showClansMsg('Free tier is limited to 2 clans. Upgrade to join more.', true);
+            } else if (insertResult.error.code === '23505') {
+              showClansMsg('You\'re already in that clan.', true);
+            } else {
+              showClansMsg('Could not join: ' + insertResult.error.message, true);
+            }
+            return;
+          }
+          showClansMsg('Joined "' + clan.name + '"!');
+          document.getElementById('joinCodeInput').value = '';
+          loadAndRenderClans();
+        });
+    });
+});
+
+function loadAndRenderClans() {
+  if (!supabaseClient || !currentUser) return;
+
+  supabaseClient.from('clan_members')
+    .select('clan_id')
+    .eq('user_id', currentUser.id)
+    .then(function(memberResult) {
+      if (memberResult.error || !memberResult.data) return;
+      var clanIds = memberResult.data.map(function(r) { return r.clan_id; });
+
+      if (!clanIds.length) {
+        clansListEl.innerHTML = '<p style="font-size:12px;color:#666;">You haven\'t joined a clan yet.</p>';
+        return;
+      }
+
+      supabaseClient.from('clans')
+        .select('id, name, invite_code, owner_id')
+        .in('id', clanIds)
+        .then(function(clansResult) {
+          if (clansResult.error || !clansResult.data) return;
+          renderClansList(clansResult.data);
+        });
+    });
+}
+
+function renderClansList(clanRows) {
+  clansListEl.innerHTML = '';
+  clanRows.forEach(function(clan) {
+    renderOneClanCard(clan);
+  });
+}
+
+function renderOneClanCard(clan) {
+  var card = document.createElement('div');
+  card.className = 'clan-card';
+
+  var header = document.createElement('div');
+  header.className = 'clan-card-header';
+
+  var nameEl = document.createElement('div');
+  nameEl.className = 'clan-name';
+  nameEl.textContent = clan.name;
+
+  var metaEl = document.createElement('div');
+  metaEl.className = 'clan-meta';
+  metaEl.textContent = 'Invite code: ' + clan.invite_code;
+
+  var leaveBtn = document.createElement('button');
+  leaveBtn.className = 'clan-leave';
+  leaveBtn.textContent = clan.owner_id === currentUser.id ? 'Disband' : 'Leave';
+  leaveBtn.addEventListener('click', function() {
+    if (!window.confirm('Are you sure?')) return;
+    if (clan.owner_id === currentUser.id) {
+      supabaseClient.from('clans').delete().eq('id', clan.id).then(function() { loadAndRenderClans(); });
+    } else {
+      supabaseClient.from('clan_members').delete().eq('clan_id', clan.id).eq('user_id', currentUser.id).then(function() { loadAndRenderClans(); });
+    }
+  });
+
+  header.appendChild(nameEl);
+  header.appendChild(metaEl);
+  header.appendChild(leaveBtn);
+  card.appendChild(header);
+
+  var membersWrap = document.createElement('div');
+  membersWrap.id = 'clanMembers-' + clan.id;
+  card.appendChild(membersWrap);
+
+  clansListEl.appendChild(card);
+
+  // Load this clan's members and their shared rulers
+  supabaseClient.from('clan_members')
+    .select('user_id')
+    .eq('clan_id', clan.id)
+    .then(function(memResult) {
+      if (memResult.error || !memResult.data) return;
+      var userIds = memResult.data.map(function(r) { return r.user_id; });
+
+      supabaseClient.from('profiles')
+        .select('id, display_name, timezone')
+        .in('id', userIds)
+        .then(function(profResult) {
+          if (profResult.error || !profResult.data) return;
+
+          supabaseClient.from('shared_rulers')
+            .select('user_id, blocks')
+            .in('user_id', userIds)
+            .then(function(rulerResult) {
+              var rulerMap = {};
+              if (rulerResult.data) {
+                rulerResult.data.forEach(function(r) { rulerMap[r.user_id] = r.blocks; });
+              }
+              renderClanMembers(membersWrap, profResult.data, rulerMap);
+            });
+        });
+    });
+
+  // Live updates: whenever anyone's shared ruler changes, re-render this clan
+  supabaseClient.channel('clan-' + clan.id)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'shared_rulers' }, function() {
+      renderOneClanCardRefresh(clan, membersWrap);
+    })
+    .subscribe();
+}
+
+function renderOneClanCardRefresh(clan, membersWrap) {
+  supabaseClient.from('clan_members')
+    .select('user_id')
+    .eq('clan_id', clan.id)
+    .then(function(memResult) {
+      if (memResult.error || !memResult.data) return;
+      var userIds = memResult.data.map(function(r) { return r.user_id; });
+
+      supabaseClient.from('profiles')
+        .select('id, display_name, timezone')
+        .in('id', userIds)
+        .then(function(profResult) {
+          if (profResult.error || !profResult.data) return;
+          supabaseClient.from('shared_rulers')
+            .select('user_id, blocks')
+            .in('user_id', userIds)
+            .then(function(rulerResult) {
+              var rulerMap = {};
+              if (rulerResult.data) {
+                rulerResult.data.forEach(function(r) { rulerMap[r.user_id] = r.blocks; });
+              }
+              renderClanMembers(membersWrap, profResult.data, rulerMap);
+            });
+        });
+    });
+}
+
+function renderClanMembers(container, profiles, rulerMap) {
+  container.innerHTML = '';
+  profiles.forEach(function(profile) {
+    var memberDiv = document.createElement('div');
+    memberDiv.className = 'clan-member';
+
+    var row = document.createElement('div');
+    row.className = 'clan-member-row';
+
+    var nameSpan = document.createElement('span');
+    nameSpan.className = 'clan-member-name';
+    nameSpan.textContent = profile.display_name + (profile.id === currentUser.id ? ' (you)' : '');
+
+    var timeSpan = document.createElement('span');
+    timeSpan.className = 'clan-member-time';
+    var localInfo = getLocalTimeInfo(profile.timezone);
+    timeSpan.textContent = localInfo.text;
+    if (localInfo.isNight) timeSpan.classList.add('is-night');
+
+    row.appendChild(nameSpan);
+    row.appendChild(timeSpan);
+    memberDiv.appendChild(row);
+
+    var track = document.createElement('div');
+    track.className = 'clan-mini-track';
+    var memberBlocks = rulerMap[profile.id] || [];
+
+    if (memberBlocks.length) {
+      memberBlocks.forEach(function(b) {
+        var miniBlock = document.createElement('div');
+        miniBlock.className = 'clan-mini-block' + (b.sleep ? ' sleep-zone' : '');
+        miniBlock.style.width = ((b.minutes / 1440) * 100) + '%';
+        track.appendChild(miniBlock);
+      });
+    }
+    memberDiv.appendChild(track);
+    container.appendChild(memberDiv);
+  });
+}
+
+function getLocalTimeInfo(timezone) {
+  try {
+    var now = new Date();
+    var timeStr = now.toLocaleTimeString('en-US', { timeZone: timezone, hour: '2-digit', minute: '2-digit' });
+    var hourStr = now.toLocaleTimeString('en-US', { timeZone: timezone, hour: 'numeric', hour12: false });
+    var hour = parseInt(hourStr, 10);
+    var isNight = (hour < 7 || hour >= 22);
+    return { text: timeStr, isNight: isNight };
+  } catch (e) {
+    return { text: '—', isNight: false };
+  }
+}
+
 
 renderRuler();
 loadTodayDraft();
