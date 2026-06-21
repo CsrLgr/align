@@ -1342,9 +1342,7 @@ document.getElementById('joinClanBtn').addEventListener('click', function() {
   var code = document.getElementById('joinCodeInput').value.trim();
   if (!code) { showClansMsg('Enter an invite code first.', true); return; }
 
-  supabaseClient.from('clans')
-    .select('id, name')
-    .eq('invite_code', code)
+  supabaseClient.rpc('find_clan_by_invite_code', { code: code })
     .then(function(result) {
       if (result.error || !result.data || !result.data.length) {
         showClansMsg('No clan found with that code.', true);
