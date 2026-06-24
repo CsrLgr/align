@@ -69,12 +69,37 @@
   .header { text-align: center; margin-bottom: 0.5rem; }
   .header h1 { font-size: 28px; margin: 0; color: #eee; }
   .header p { font-size: 14px; color: #999; margin-top: 0.4rem; }
-  .header .live-clock {
+  .header .tagline {
+    font-size: 11px;
+    color: #c0b5a5;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-top: 0.15rem;
+    margin-bottom: 0;
+  }
+  .clocks-row {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    margin-top: 0.6rem;
+    flex-wrap: wrap;
+  }
+  .clock-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .clock-item .clock-label {
+    font-size: 9px;
+    color: #777;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  .clock-item .clock-value {
     font-size: 13px;
     color: #c0b5a5;
-    margin-top: 0.5rem;
-    letter-spacing: 0.05em;
     font-variant-numeric: tabular-nums;
+    margin-top: 0.1rem;
   }
 
   .section-label {
@@ -271,6 +296,24 @@
     min-width: 220px;
   }
 
+  .journal-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+  .category-select {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 6px;
+    color: #c0b5a5;
+    font-family: Georgia, serif;
+    font-size: 11px;
+    padding: 0.3rem 0.5rem;
+    cursor: pointer;
+  }
+  .category-select:focus { outline: 1px solid #c0b5a5; }
+
   textarea {
     width: 100%;
     min-height: 110px;
@@ -322,6 +365,21 @@
   .must-item:last-child { border-bottom: none; }
   .must-item .must-label { flex: 1; }
   .must-item .must-note { font-size: 10px; color: #666; }
+  .must-score-wrap { display: flex; gap: 0.25rem; margin-left: auto; }
+  .must-score-btn {
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border-radius: 4px;
+    border: 1px solid #444;
+    background: #1a1a1a;
+    color: #777;
+    font-size: 10px;
+    font-family: Georgia, serif;
+    cursor: pointer;
+  }
+  .must-score-btn:hover { border-color: #c0b5a5; color: #c0b5a5; }
+  .must-score-btn.active { background: #c0b5a5; color: #1a1a1a; border-color: #c0b5a5; font-weight: bold; }
   .must-add-row { display: flex; gap: 0.4rem; margin-top: 0.5rem; }
   .must-add-row input[type="text"] {
     flex: 1;
@@ -399,8 +457,71 @@
     padding: 0.85rem;
     margin-bottom: 0.6rem;
   }
-  .entry-date { font-size: 11px; color: #c0b5a5; margin-bottom: 0.4rem; }
+  .entry-top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 0.4rem;
+  }
+  .entry-date { font-size: 11px; color: #c0b5a5; }
+  .entry-category {
+    font-size: 10px;
+    color: #1a1a1a;
+    background: #c0b5a5;
+    border-radius: 4px;
+    padding: 0.1rem 0.4rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .entry-edited {
+    font-size: 10px;
+    color: #777;
+    font-style: italic;
+  }
+  .entry-edited a {
+    color: #999;
+    cursor: pointer;
+    text-decoration: underline;
+  }
   .entry-text { font-size: 12px; color: #ccc; white-space: pre-wrap; }
+  .entry-bottom-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 0.5rem;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .entry-share-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 10px;
+    color: #888;
+  }
+  .entry-share-toggle input[type="checkbox"] { accent-color: #c0b5a5; cursor: pointer; }
+  .entry-edit-btn {
+    background: none;
+    border: 1px solid #444;
+    color: #888;
+    font-size: 10px;
+    padding: 0.25rem 0.55rem;
+    cursor: pointer;
+    border-radius: 4px;
+    font-family: Georgia, serif;
+  }
+  .entry-edit-btn:hover { border-color: #c0b5a5; color: #c0b5a5; }
+  .entry-history {
+    margin-top: 0.6rem;
+    padding-top: 0.5rem;
+    border-top: 1px dashed #2a2a2a;
+    font-size: 11px;
+    color: #777;
+  }
+  .entry-history-version { margin-bottom: 0.5rem; white-space: pre-wrap; }
+  .entry-history-ts { color: #555; font-size: 10px; display: block; margin-bottom: 0.15rem; }
 
   .clans-col {
     flex: 1 1 380px;
@@ -542,8 +663,22 @@
 <div class="page-wrap">
   <div class="header">
     <h1>My Ruler</h1>
+    <p class="tagline">For Dangerous Gentlemen</p>
     <p>Your 12-block day planner</p>
-    <div class="live-clock" id="liveClock">—</div>
+    <div class="clocks-row">
+      <div class="clock-item">
+        <span class="clock-label">Local</span>
+        <span class="clock-value" id="localClock">—</span>
+      </div>
+      <div class="clock-item">
+        <span class="clock-label">UTC</span>
+        <span class="clock-value" id="utcClock">—</span>
+      </div>
+      <div class="clock-item">
+        <span class="clock-label">Block</span>
+        <span class="clock-value" id="blockClock">—</span>
+      </div>
+    </div>
   </div>
 
   <div class="tackle-wrap">
@@ -578,7 +713,10 @@
 
 <div class="panels-row">
   <div class="panel-col-notes">
-    <span class="section-label">Journal Notes</span>
+    <div class="journal-header-row">
+      <span class="section-label">Journal Notes</span>
+      <select id="categorySelect" class="category-select"></select>
+    </div>
     <textarea id="workArea" placeholder="Write your day here..."></textarea>
     <div class="btn-row" style="justify-content:center;">
       <button id="saveBtn" class="combo-btn">Save Entry / New Day</button>
@@ -832,8 +970,24 @@ function findCurrentBlockIndex(sinceSix) {
 
 function updateLiveClock() {
   var now = new Date();
-  var timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  document.getElementById('liveClock').textContent = timeStr;
+
+  var localStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  document.getElementById('localClock').textContent = localStr;
+
+  var utcStr = now.toLocaleTimeString('en-GB', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  document.getElementById('utcClock').textContent = utcStr + ' UTC';
+
+  var sinceSix = getSinceSix();
+  var idx = findCurrentBlockIndex(sinceSix);
+  var blockEl = document.getElementById('blockClock');
+  if (idx !== -1 && blockEls[idx]) {
+    var be = blockEls[idx];
+    var elapsed = Math.round(sinceSix - be.startMin);
+    var total = Math.round(be.endMin - be.startMin);
+    blockEl.textContent = 'Block ' + (idx + 1) + ' • ' + elapsed + '/' + total + ' min';
+  } else {
+    blockEl.textContent = '—';
+  }
 }
 
 function updateLive() {
@@ -861,11 +1015,88 @@ function updateLive() {
   document.getElementById('dayProgress').textContent = Math.round(dayPct) + '% elapsed';
 }
 
+var JOURNAL_CATEGORIES_KEY = 'csrAlignCategories';
+var DEFAULT_CATEGORIES = ['Trader', 'Personal', 'Projects', 'Miscellaneous'];
+
+function loadCategories() {
+  var saved = localStorage.getItem(JOURNAL_CATEGORIES_KEY);
+  if (saved) {
+    try {
+      var parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length) return parsed;
+    } catch(e) {}
+  }
+  return DEFAULT_CATEGORIES.slice();
+}
+
+function saveCategories(cats) {
+  localStorage.setItem(JOURNAL_CATEGORIES_KEY, JSON.stringify(cats));
+}
+
+var journalCategories = loadCategories();
+var categorySelect = document.getElementById('categorySelect');
+
+function renderCategoryOptions() {
+  var currentVal = categorySelect.value;
+  categorySelect.innerHTML = '';
+  journalCategories.forEach(function(cat) {
+    var opt = document.createElement('option');
+    opt.value = cat;
+    opt.textContent = cat;
+    categorySelect.appendChild(opt);
+  });
+  var addOpt = document.createElement('option');
+  addOpt.value = '__add_new__';
+  addOpt.textContent = '+ Add category...';
+  categorySelect.appendChild(addOpt);
+  if (currentVal && journalCategories.indexOf(currentVal) !== -1) {
+    categorySelect.value = currentVal;
+  }
+}
+renderCategoryOptions();
+
+categorySelect.addEventListener('change', function() {
+  if (categorySelect.value === '__add_new__') {
+    var newCat = window.prompt('New category name:');
+    if (newCat && newCat.trim()) {
+      newCat = newCat.trim();
+      if (journalCategories.indexOf(newCat) === -1) {
+        journalCategories.push(newCat);
+        saveCategories(journalCategories);
+      }
+      renderCategoryOptions();
+      categorySelect.value = newCat;
+    } else {
+      categorySelect.value = journalCategories[0] || '';
+    }
+  }
+});
+
 // ---- Journal entries ----
+// Entry shape: { id, date, createdAt, text, category, score, shareWithClan,
+//                edited, history: [{ text, editedAt }] }
 function loadEntries() {
   var saved = localStorage.getItem(ENTRIES_KEY);
   if (saved) {
-    try { return JSON.parse(saved); } catch(e) { return []; }
+    try {
+      var parsed = JSON.parse(saved);
+      // Migrate old entries ({date, text}) to the new structure, preserving
+      // everything that existed before and filling in safe defaults for
+      // anything new. Nothing from the old format is ever lost.
+      return parsed.map(function(e) {
+        return {
+          id: e.id || ('entry-' + Math.random().toString(36).slice(2) + Date.now()),
+          date: e.date,
+          createdAt: e.createdAt || e.date,
+          text: e.text,
+          category: e.category || 'Miscellaneous',
+          score: (typeof e.score === 'number') ? e.score : null,
+          shareWithClan: !!e.shareWithClan,
+          edited: !!e.edited,
+          history: Array.isArray(e.history) ? e.history : []
+        };
+      });
+    } catch(e) { return []; }
   }
   return [];
 }
@@ -874,23 +1105,114 @@ function saveEntries(entries) {
   localStorage.setItem(ENTRIES_KEY, JSON.stringify(entries));
 }
 
+function averageMustsScore() {
+  var scored = musts.filter(function(m) { return typeof m.score === 'number'; });
+  if (!scored.length) return null;
+  var sum = scored.reduce(function(acc, m) { return acc + m.score; }, 0);
+  return Math.round((sum / scored.length) * 10) / 10;
+}
+
 function renderEntries() {
   var entries = loadEntries();
   var container = document.getElementById('entriesList');
   container.innerHTML = '';
   entries.slice().reverse().forEach(function(entry) {
-    var div = document.createElement('div');
-    div.className = 'entry-item';
-    var dateDiv = document.createElement('div');
-    dateDiv.className = 'entry-date';
-    dateDiv.textContent = entry.date;
-    var textDiv = document.createElement('div');
-    textDiv.className = 'entry-text';
-    textDiv.textContent = entry.text;
-    div.appendChild(dateDiv);
-    div.appendChild(textDiv);
-    container.appendChild(div);
+    container.appendChild(buildEntryElement(entry, entries));
   });
+}
+
+function buildEntryElement(entry) {
+  var div = document.createElement('div');
+  div.className = 'entry-item';
+
+  var topRow = document.createElement('div');
+  topRow.className = 'entry-top-row';
+
+  var dateDiv = document.createElement('span');
+  dateDiv.className = 'entry-date';
+  dateDiv.textContent = entry.date;
+  topRow.appendChild(dateDiv);
+
+  var catBadge = document.createElement('span');
+  catBadge.className = 'entry-category';
+  catBadge.textContent = entry.category;
+  topRow.appendChild(catBadge);
+
+  if (entry.edited) {
+    var editedSpan = document.createElement('span');
+    editedSpan.className = 'entry-edited';
+    var lastEdit = entry.history[entry.history.length - 1];
+    editedSpan.innerHTML = 'Edited' + (lastEdit ? ' ' + lastEdit.editedAt : '') + ' — <a>view history</a>';
+    editedSpan.querySelector('a').addEventListener('click', function() {
+      historyDiv.style.display = (historyDiv.style.display === 'none') ? '' : 'none';
+    });
+    topRow.appendChild(editedSpan);
+  }
+
+  div.appendChild(topRow);
+
+  var textDiv = document.createElement('div');
+  textDiv.className = 'entry-text';
+  textDiv.textContent = entry.text;
+  div.appendChild(textDiv);
+
+  var historyDiv = document.createElement('div');
+  historyDiv.className = 'entry-history';
+  historyDiv.style.display = 'none';
+  entry.history.slice().reverse().forEach(function(v) {
+    var verDiv = document.createElement('div');
+    verDiv.className = 'entry-history-version';
+    var ts = document.createElement('span');
+    ts.className = 'entry-history-ts';
+    ts.textContent = 'Previous version (' + v.editedAt + '):';
+    verDiv.appendChild(ts);
+    verDiv.appendChild(document.createTextNode(v.text));
+    historyDiv.appendChild(verDiv);
+  });
+  if (entry.history.length) div.appendChild(historyDiv);
+
+  var bottomRow = document.createElement('div');
+  bottomRow.className = 'entry-bottom-row';
+
+  var shareLabel = document.createElement('label');
+  shareLabel.className = 'entry-share-toggle';
+  var shareCheckbox = document.createElement('input');
+  shareCheckbox.type = 'checkbox';
+  shareCheckbox.checked = !!entry.shareWithClan;
+  shareCheckbox.addEventListener('change', function() {
+    var allEntries = loadEntries();
+    var target = allEntries.filter(function(e) { return e.id === entry.id; })[0];
+    if (target) {
+      target.shareWithClan = shareCheckbox.checked;
+      saveEntries(allEntries);
+    }
+  });
+  shareLabel.appendChild(shareCheckbox);
+  shareLabel.appendChild(document.createTextNode('Share with Clan'));
+  bottomRow.appendChild(shareLabel);
+
+  var editBtn = document.createElement('button');
+  editBtn.className = 'entry-edit-btn';
+  editBtn.textContent = 'Edit';
+  editBtn.addEventListener('click', function() {
+    var newText = window.prompt('Edit entry:', entry.text);
+    if (newText === null || newText === entry.text) return;
+    var allEntries = loadEntries();
+    var target = allEntries.filter(function(e) { return e.id === entry.id; })[0];
+    if (target) {
+      var now = new Date();
+      target.history.push({ text: target.text, editedAt: now.toLocaleDateString() + ' ' + now.toLocaleTimeString() });
+      target.text = newText;
+      target.edited = true;
+      saveEntries(allEntries);
+      renderEntries();
+    }
+  });
+  bottomRow.appendChild(editBtn);
+
+  div.appendChild(bottomRow);
+
+  return div;
 }
 
 var workArea = document.getElementById('workArea');
@@ -912,7 +1234,17 @@ document.getElementById('saveBtn').addEventListener('click', function() {
     var entries = loadEntries();
     var today = new Date();
     var dateStr = today.toLocaleDateString() + ' ' + today.toLocaleTimeString();
-    entries.push({ date: dateStr, text: workArea.value });
+    entries.push({
+      id: 'entry-' + Math.random().toString(36).slice(2) + Date.now(),
+      date: dateStr,
+      createdAt: today.toISOString(),
+      text: workArea.value,
+      category: categorySelect.value && categorySelect.value !== '__add_new__' ? categorySelect.value : 'Miscellaneous',
+      score: averageMustsScore(),
+      shareWithClan: false,
+      edited: false,
+      history: []
+    });
     saveEntries(entries);
     renderEntries();
   }
@@ -935,11 +1267,13 @@ function loadMusts() {
       if (Array.isArray(parsed) && parsed.length) {
         // migrate: drop the retired "Eat right" fixed item if present from an earlier version
         parsed = parsed.filter(function(m) { return m.id !== 'eat'; });
+        // migrate: ensure every must has a score field (null = not yet scored today)
+        parsed.forEach(function(m) { if (typeof m.score === 'undefined') m.score = null; });
         return parsed;
       }
     } catch(e) {}
   }
-  return DEFAULT_MUSTS.map(function(m){ return Object.assign({}, m); });
+  return DEFAULT_MUSTS.map(function(m){ return Object.assign({ score: null }, m); });
 }
 
 function saveMusts() {
@@ -948,6 +1282,7 @@ function saveMusts() {
 
 var musts = loadMusts();
 var mustsBox = document.getElementById('mustsBox');
+var SCORE_LABELS = { 1: 'Poor', 2: 'Average', 3: 'Excellent' };
 
 function renderMusts() {
   mustsBox.innerHTML = '';
@@ -966,6 +1301,22 @@ function renderMusts() {
       note.textContent = m.note;
       row.appendChild(note);
     }
+
+    var scoreWrap = document.createElement('span');
+    scoreWrap.className = 'must-score-wrap';
+    [1, 2, 3].forEach(function(val) {
+      var btn = document.createElement('button');
+      btn.className = 'must-score-btn' + (m.score === val ? ' active' : '');
+      btn.textContent = val;
+      btn.title = SCORE_LABELS[val];
+      btn.addEventListener('click', function() {
+        musts[idx].score = (musts[idx].score === val) ? null : val;
+        saveMusts();
+        renderMusts();
+      });
+      scoreWrap.appendChild(btn);
+    });
+    row.appendChild(scoreWrap);
 
     if (!m.fixed) {
       var rm = document.createElement('button');
@@ -993,7 +1344,7 @@ function renderMusts() {
   function addMust() {
     var val = input.value.trim();
     if (!val) return;
-    musts.push({ id: 'custom-' + Date.now(), label: val, note: '', fixed: false });
+    musts.push({ id: 'custom-' + Date.now(), label: val, note: '', fixed: false, score: null });
     saveMusts();
     renderMusts();
   }
