@@ -523,7 +523,7 @@
      Tackle/Whiteboard box on the right. 7 rows, Monday = day 1. */
   .weekly-wrap {
     position: absolute;
-    top: 0;
+    top: -8px;
     left: 0;
     z-index: 10;
   }
@@ -533,6 +533,7 @@
     border: 1px solid #3a3327;
     border-radius: 8px;
     padding: 0.75rem;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45);
   }
   .weekly-box .section-label { font-size: 11px; margin-bottom: 0.4rem; }
   .weekly-day-row {
@@ -567,6 +568,29 @@
     min-width: 0;
   }
   .weekly-day-input:focus { outline: none; border-bottom-color: #c0b5a5; }
+
+  .weekly-col-headers {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0 0.3rem;
+    margin-bottom: 0.3rem;
+  }
+  .weekly-col-header-days {
+    width: 16px;
+    flex-shrink: 0;
+    font-size: 9px;
+    color: #777;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    text-align: center;
+  }
+  .weekly-col-header-details {
+    flex: 1;
+    font-size: 9px;
+    color: #777;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
 
   .export-section {
     max-width: 1100px;
@@ -911,6 +935,10 @@
   <div class="weekly-wrap">
     <div class="weekly-box">
       <span class="section-label">Weekly Visualization</span>
+      <div class="weekly-col-headers">
+        <span class="weekly-col-header-days">Days</span>
+        <span class="weekly-col-header-details">Details</span>
+      </div>
       <div id="weeklyDaysList"></div>
     </div>
   </div>
@@ -1979,7 +2007,7 @@ function renderWeeklyViz() {
     var input = document.createElement('input');
     input.type = 'text';
     input.className = 'weekly-day-input';
-    input.placeholder = 'Day ' + (i + 1) + '...';
+    input.placeholder = '...';
     input.value = weeklyVizDays[i] || '';
     (function(idx) {
       input.addEventListener('input', function() {
