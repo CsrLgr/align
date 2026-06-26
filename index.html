@@ -2712,13 +2712,15 @@ document.getElementById('exportBookBtn').addEventListener('click', function() {
     return;
   }
 
+  showExportMsg('Building your PDF report — this may take a moment if there are images...');
+
   gatherExportData(filters, function(bundle) {
-    buildPdfReport(bundle);
-    showExportMsg(
-      'PDF report generated with ' + bundle.entries.length + ' entries and ' + bundle.snapshots.length + ' daily Rulers.' +
-      (filters.wasClipped ? ' (Free tier: limited to the last ' + FREE_TIER_EXPORT_DAYS + ' days. Upgrade for full history.)' : '') +
-      ' Images attached locally are not yet included — that\'s coming in a future update.'
-    );
+    buildPdfReport(bundle, function() {
+      showExportMsg(
+        'PDF report generated with ' + bundle.entries.length + ' entries and ' + bundle.snapshots.length + ' daily Rulers.' +
+        (filters.wasClipped ? ' (Free tier: limited to the last ' + FREE_TIER_EXPORT_DAYS + ' days. Upgrade for full history.)' : '')
+      );
+    });
   });
 });
 
@@ -2726,7 +2728,67 @@ document.getElementById('exportBookBtn').addEventListener('click', function() {
 // Structure: cover/summary page (range, totals, category breakdown,
 // average score) followed by one section per day (Ruler table, Musts
 // score, journal entries for that day).
-function buildPdfReport(bundle) {
+// Fetches every image across all given entries and converts each to a
+// data URL + its natural pixel dimensions, so jsPDF can embed them
+// directly. Must run BEFORE any PDF drawing starts, since PDF
+// generation itself is synchronous but fetching images is not.
+// Returns a map: entry.id -> [{ dataUrl, width, height }, ...]
+function preloadEntryImagesForPdf(entries, callback) {
+  var imagesByEntryId = {};
+  var entriesWithImages = entries.filter(function(e) { return e.imagePaths && e.imagePaths.length; });
+
+  if (!entriesWithImages.length || !supabaseClient || !currentUser) {
+    callback(imagesByEntryId);
+    return;
+  }
+
+  Promise.all(entriesWithImages.map(function(entry) {
+    return getSignedUrlsForPathsPromise(entry.imagePaths).then(function(urls) {
+      return Promise.all(urls.map(loadImageAsDataUrl)).then(function(loaded) {
+        imagesByEntryId[entry.id] = loaded.filter(Boolean);
+      });
+    });
+  })).then(function() {
+    callback(imagesByEntryId);
+  });
+}
+
+function getSignedUrlsForPathsPromise(paths) {
+  return Promise.all(paths.map(function(path) {
+    return supabaseClient.storage.from('journal-images').createSignedUrl(path, 3600)
+      .then(function(result) { return (result.data && result.data.signedUrl) || null; });
+  })).then(function(urls) { return urls.filter(Boolean); });
+}
+
+function loadImageAsDataUrl(url) {
+  return new Promise(function(resolve) {
+    var img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = function() {
+      var canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      try {
+        var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        resolve({ dataUrl: dataUrl, width: img.naturalWidth, height: img.naturalHeight });
+      } catch (e) {
+        resolve(null); // CORS or decode failure — skip this image rather than break the whole export
+      }
+    };
+    img.onerror = function() { resolve(null); };
+    img.src = url;
+  });
+}
+
+function buildPdfReport(bundle, onComplete) {
+  preloadEntryImagesForPdf(bundle.entries, function(imagesByEntryId) {
+    renderPdfDocument(bundle, imagesByEntryId, onComplete);
+  });
+}
+
+function renderPdfDocument(bundle, imagesByEntryId, onComplete) {
   var entries = bundle.entries;
   var snapshots = bundle.snapshots;
   var tackleText = bundle.tackleText;
@@ -2870,10 +2932,23 @@ function buildPdfReport(bundle) {
         y += 14;
       });
       y += 10;
+
+      var entryImages = imagesByEntryId[e.id] || [];
+      var maxImgWidth = pageWidth - marginX * 2;
+      var maxImgHeight = 220;
+      entryImages.forEach(function(imgData) {
+        var ratio = Math.min(maxImgWidth / imgData.width, maxImgHeight / imgData.height, 1);
+        var drawW = imgData.width * ratio;
+        var drawH = imgData.height * ratio;
+        if (y + drawH > 770) { doc.addPage(); y = 50; }
+        doc.addImage(imgData.dataUrl, 'JPEG', marginX, y, drawW, drawH);
+        y += drawH + 12;
+      });
     });
   });
 
   doc.save('my-ruler-report-' + todayUTCDateString() + '.pdf');
+  if (typeof onComplete === 'function') onComplete();
 }
 
 
