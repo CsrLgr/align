@@ -519,6 +519,55 @@
     cursor: pointer;
   }
 
+  /* Weekly Visualization box, fixed top left corner — mirrors the
+     Tackle/Whiteboard box on the right. 7 rows, Monday = day 1. */
+  .weekly-wrap {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 10;
+  }
+  .weekly-box {
+    width: 240px;
+    background: #161616;
+    border: 1px solid #3a3327;
+    border-radius: 8px;
+    padding: 0.75rem;
+  }
+  .weekly-box .section-label { font-size: 11px; margin-bottom: 0.4rem; }
+  .weekly-day-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.3rem;
+    border-radius: 4px;
+    margin-bottom: 2px;
+  }
+  .weekly-day-row.is-today {
+    background: rgba(192,181,165,0.15);
+    box-shadow: inset 0 0 0 1px rgba(192,181,165,0.4);
+  }
+  .weekly-day-num {
+    width: 16px;
+    flex-shrink: 0;
+    font-size: 11px;
+    color: #c0b5a5;
+    font-weight: bold;
+    text-align: center;
+  }
+  .weekly-day-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid #2a2a2a;
+    color: #ddd;
+    font-family: Georgia, serif;
+    font-size: 11px;
+    padding: 0.15rem 0.2rem;
+    min-width: 0;
+  }
+  .weekly-day-input:focus { outline: none; border-bottom-color: #c0b5a5; }
+
   .export-section {
     max-width: 1100px;
     margin: 1.5rem auto 0 auto;
@@ -669,6 +718,26 @@
     font-family: Georgia, serif;
   }
   .entry-edit-btn:hover { border-color: #c0b5a5; color: #c0b5a5; }
+  .entry-edit-form {
+    margin-top: 0.6rem;
+    padding-top: 0.6rem;
+    border-top: 1px dashed #2a2a2a;
+  }
+  .entry-edit-form select { margin-bottom: 0.5rem; }
+  .entry-edit-textarea {
+    width: 100%;
+    min-height: 100px;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 6px;
+    color: #eee;
+    font-family: Georgia, serif;
+    font-size: 12px;
+    padding: 0.6rem;
+    resize: vertical;
+  }
+  .entry-edit-textarea:focus { outline: 1px solid #c0b5a5; }
+  .entry-edit-form .btn-row { margin-top: 0.5rem; }
   .entry-history {
     margin-top: 0.6rem;
     padding-top: 0.5rem;
@@ -803,7 +872,9 @@
 
   @media (max-width: 700px) {
     body { padding: 1.25rem 0.75rem; }
+    .weekly-wrap { position: static; display: flex; justify-content: center; margin-bottom: 1rem; order: -1; }
     .tackle-wrap { position: static; display: flex; justify-content: center; margin-bottom: 1rem; }
+    .weekly-box,
     .tackle-box { width: 100%; max-width: 280px; }
     .resize-handle { right: -14px; width: 28px; }
     .clans-actions input[type="text"] { width: 100px; }
@@ -834,6 +905,13 @@
         <span class="clock-label">Block</span>
         <span class="clock-value" id="blockClock">—</span>
       </div>
+    </div>
+  </div>
+
+  <div class="weekly-wrap">
+    <div class="weekly-box">
+      <span class="section-label">Weekly Visualization</span>
+      <div id="weeklyDaysList"></div>
     </div>
   </div>
 
@@ -983,6 +1061,7 @@ var MUSTS_KEY = 'csrAlignMusts';
 var TACKLE_KEY = 'csrAlignTackle';
 var LOCAL_SNAPSHOTS_KEY = 'csrAlignDailySnapshots';
 var LAST_SNAPSHOT_DATE_KEY = 'csrAlignLastSnapshotDate';
+var WEEKLY_VIZ_KEY = 'csrAlignWeeklyViz';
 
 // ---- Local daily snapshot fallback ----
 // Browsers can't run code while closed, so this can't fire at an
@@ -1462,12 +1541,84 @@ function buildEntryElement(entry) {
     verDiv.className = 'entry-history-version';
     var ts = document.createElement('span');
     ts.className = 'entry-history-ts';
-    ts.textContent = 'Previous version (' + v.editedAt + '):';
+    ts.textContent = 'Previous version (' + v.editedAt + ')' + (v.category ? ' — was "' + v.category + '"' : '') + ':';
     verDiv.appendChild(ts);
     verDiv.appendChild(document.createTextNode(v.text));
     historyDiv.appendChild(verDiv);
   });
   if (entry.history.length) div.appendChild(historyDiv);
+
+  // ---- Inline edit form (hidden until Edit is clicked) ----
+  var editForm = document.createElement('div');
+  editForm.className = 'entry-edit-form';
+  editForm.style.display = 'none';
+
+  var editCategorySelect = document.createElement('select');
+  editCategorySelect.className = 'category-select';
+  journalCategories.forEach(function(cat) {
+    var opt = document.createElement('option');
+    opt.value = cat;
+    opt.textContent = cat;
+    if (cat === entry.category) opt.selected = true;
+    editCategorySelect.appendChild(opt);
+  });
+
+  var editTextarea = document.createElement('textarea');
+  editTextarea.value = entry.text;
+  editTextarea.className = 'entry-edit-textarea';
+
+  var editBtnRow = document.createElement('div');
+  editBtnRow.className = 'btn-row';
+
+  var saveEditBtn = document.createElement('button');
+  saveEditBtn.textContent = 'Save Changes';
+  saveEditBtn.className = 'combo-btn';
+
+  var cancelEditBtn = document.createElement('button');
+  cancelEditBtn.textContent = 'Cancel';
+  cancelEditBtn.className = 'secondary';
+
+  editBtnRow.appendChild(saveEditBtn);
+  editBtnRow.appendChild(cancelEditBtn);
+
+  editForm.appendChild(editCategorySelect);
+  editForm.appendChild(editTextarea);
+  editForm.appendChild(editBtnRow);
+  div.appendChild(editForm);
+
+  saveEditBtn.addEventListener('click', function() {
+    var newText = editTextarea.value;
+    var newCategory = editCategorySelect.value;
+    var changed = (newText !== entry.text) || (newCategory !== entry.category);
+
+    if (changed) {
+      var allEntries = loadEntries();
+      var target = allEntries.filter(function(e) { return e.id === entry.id; })[0];
+      if (target) {
+        var now = new Date();
+        target.history.push({
+          text: target.text,
+          category: target.category,
+          editedAt: now.toLocaleDateString() + ' ' + now.toLocaleTimeString()
+        });
+        target.text = newText;
+        target.category = newCategory;
+        target.edited = true;
+        saveEntries(allEntries);
+        renderEntries();
+        return;
+      }
+    }
+    editForm.style.display = 'none';
+    textDiv.style.display = '';
+  });
+
+  cancelEditBtn.addEventListener('click', function() {
+    editTextarea.value = entry.text;
+    editCategorySelect.value = entry.category;
+    editForm.style.display = 'none';
+    textDiv.style.display = '';
+  });
 
   var bottomRow = document.createElement('div');
   bottomRow.className = 'entry-bottom-row';
@@ -1493,18 +1644,10 @@ function buildEntryElement(entry) {
   editBtn.className = 'entry-edit-btn';
   editBtn.textContent = 'Edit';
   editBtn.addEventListener('click', function() {
-    var newText = window.prompt('Edit entry:', entry.text);
-    if (newText === null || newText === entry.text) return;
-    var allEntries = loadEntries();
-    var target = allEntries.filter(function(e) { return e.id === entry.id; })[0];
-    if (target) {
-      var now = new Date();
-      target.history.push({ text: target.text, editedAt: now.toLocaleDateString() + ' ' + now.toLocaleTimeString() });
-      target.text = newText;
-      target.edited = true;
-      saveEntries(allEntries);
-      renderEntries();
-    }
+    var opening = (editForm.style.display === 'none');
+    editForm.style.display = opening ? '' : 'none';
+    textDiv.style.display = opening ? 'none' : '';
+    if (opening) editTextarea.focus();
   });
   bottomRow.appendChild(editBtn);
 
@@ -1789,6 +1932,67 @@ function saveTackle() {
 }
 tackleArea.addEventListener('input', saveTackle);
 tackleShare.addEventListener('change', saveTackle);
+
+// ---- Weekly Visualization ----
+// 7 recurring day-slots (Monday = 1 ... Sunday = 7), not tied to any
+// specific calendar week — a reusable weekly template, same one every
+// week, that the person fills in with whatever they want each slot to
+// mean for them.
+var weeklyDaysList = document.getElementById('weeklyDaysList');
+
+function loadWeeklyViz() {
+  var saved = localStorage.getItem(WEEKLY_VIZ_KEY);
+  if (saved) {
+    try {
+      var parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length === 7) return parsed;
+    } catch(e) {}
+  }
+  return ['', '', '', '', '', '', ''];
+}
+
+function saveWeeklyViz(days) {
+  localStorage.setItem(WEEKLY_VIZ_KEY, JSON.stringify(days));
+}
+
+var weeklyVizDays = loadWeeklyViz();
+
+// JS Date.getDay() returns 0=Sunday...6=Saturday. We want Monday=1
+// ... Sunday=7, so this converts between the two.
+function todayAsMondayFirstIndex() {
+  var jsDay = new Date().getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+  return jsDay === 0 ? 6 : jsDay - 1; // 0=Mon ... 6=Sun
+}
+
+function renderWeeklyViz() {
+  weeklyDaysList.innerHTML = '';
+  var todayIdx = todayAsMondayFirstIndex();
+
+  for (var i = 0; i < 7; i++) {
+    var row = document.createElement('div');
+    row.className = 'weekly-day-row' + (i === todayIdx ? ' is-today' : '');
+
+    var num = document.createElement('span');
+    num.className = 'weekly-day-num';
+    num.textContent = String(i + 1);
+
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'weekly-day-input';
+    input.placeholder = 'Day ' + (i + 1) + '...';
+    input.value = weeklyVizDays[i] || '';
+    (function(idx) {
+      input.addEventListener('input', function() {
+        weeklyVizDays[idx] = input.value;
+        saveWeeklyViz(weeklyVizDays);
+      });
+    })(i);
+
+    row.appendChild(num);
+    row.appendChild(input);
+    weeklyDaysList.appendChild(row);
+  }
+}
 
 // ============================================================
 // Supabase auth — magic link login (additive only, never blocks
@@ -2958,6 +3162,7 @@ loadTodayDraft();
 renderEntries();
 renderMusts();
 loadTackle();
+renderWeeklyViz();
 updateLive();
 setInterval(updateLive, 1000);
 
