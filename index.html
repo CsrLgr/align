@@ -366,6 +366,11 @@
     white-space: nowrap;
   }
   .journal-image-add-btn:hover { border-color: #c0b5a5; }
+  .journal-image-paste-hint {
+    font-size: 10px;
+    color: #666;
+    font-style: italic;
+  }
   .journal-images-locked {
     font-size: 11px;
     color: #777;
@@ -875,6 +880,7 @@
         + Add image
         <input type="file" id="journalImageInput" accept="image/*" multiple style="display:none;">
       </label>
+      <span class="journal-image-paste-hint">or paste a screenshot directly into the box above</span>
     </div>
     <p class="journal-images-locked" id="journalImagesLocked" style="display:none;">
       📷 Attaching images to entries is a paid feature. <a id="journalImagesUpgradeLink">Upgrade to unlock.</a>
@@ -1549,6 +1555,24 @@ journalImageInput.addEventListener('change', function() {
     uploadJournalImage(file);
   });
   journalImageInput.value = '';
+});
+
+// Paste an image (e.g. a copied screenshot) directly into the journal
+// textarea to attach it — same upload path as the "+ Add image"
+// button, just triggered a different way. Text pasting is completely
+// unaffected; this only intercepts actual image data in the clipboard.
+workArea.addEventListener('paste', function(e) {
+  if (!currentUser || !currentUserIsPaid) return;
+  var items = (e.clipboardData && e.clipboardData.items) || [];
+  var foundImage = false;
+  for (var i = 0; i < items.length; i++) {
+    if (items[i].type && items[i].type.indexOf('image/') === 0) {
+      foundImage = true;
+      var file = items[i].getAsFile();
+      if (file) uploadJournalImage(file);
+    }
+  }
+  if (foundImage) e.preventDefault(); // stop it from also pasting as garbled text/binary
 });
 
 function uploadJournalImage(file) {
