@@ -290,12 +290,17 @@
     align-items: flex-start;
   }
   .panel-col-notes {
-    flex: 1 1 320px;
-    min-width: 260px;
+    flex: 1 1 220px;
+    min-width: 200px;
   }
   .panel-col-musts {
-    flex: 0 1 240px;
-    width: 240px;
+    flex: 0 1 200px;
+    width: 200px;
+    min-width: 180px;
+  }
+  .panel-col-yearly {
+    flex: 0 1 260px;
+    width: 260px;
     min-width: 220px;
   }
 
@@ -409,6 +414,7 @@
     resize: vertical;
   }
   textarea:focus { outline: 1px solid #c0b5a5; }
+  #workArea { min-height: 220px; }
 
   .btn-row { display: flex; gap: 0.6rem; margin-top: 0.75rem; }
   button {
@@ -541,6 +547,14 @@
     box-shadow: 0 6px 18px rgba(0,0,0,0.45);
   }
   .weekly-box .section-label { font-size: 11px; margin-bottom: 0.4rem; }
+
+  .yearly-box {
+    width: 100%;
+    background: #161616;
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    padding: 0.75rem;
+  }
   .weekly-day-row {
     display: flex;
     align-items: center;
@@ -1008,6 +1022,17 @@
     <span class="section-label">Musts &amp; In-between</span>
     <div class="musts-box" id="mustsBox"></div>
   </div>
+
+  <div class="panel-col-yearly">
+    <span class="section-label">Yearly Visualization</span>
+    <div class="yearly-box">
+      <div class="weekly-col-headers">
+        <span class="weekly-col-header-days">Month</span>
+        <span class="weekly-col-header-details">Details</span>
+      </div>
+      <div id="yearlyMonthsList"></div>
+    </div>
+  </div>
 </div>
 
 <div class="export-section">
@@ -1098,6 +1123,7 @@ var TACKLE_KEY = 'csrAlignTackle';
 var LOCAL_SNAPSHOTS_KEY = 'csrAlignDailySnapshots';
 var LAST_SNAPSHOT_DATE_KEY = 'csrAlignLastSnapshotDate';
 var WEEKLY_VIZ_KEY = 'csrAlignWeeklyViz';
+var YEARLY_VIZ_KEY = 'csrAlignYearlyViz';
 
 // ---- Local daily snapshot fallback ----
 // Browsers can't run code while closed, so this can't fire at an
@@ -2027,6 +2053,61 @@ function renderWeeklyViz() {
     row.appendChild(num);
     row.appendChild(input);
     weeklyDaysList.appendChild(row);
+  }
+}
+
+// ---- Yearly Visualization ----
+// Same idea as Weekly, scaled up: 12 recurring month-slots (January
+// = 1 ... December = 12), reused as a template every year rather than
+// tied to one specific calendar year. Reuses the exact same CSS
+// classes as Weekly's rows/inputs/headers since the structure is
+// identical, just a different count and a different "today" check.
+var yearlyMonthsList = document.getElementById('yearlyMonthsList');
+
+function loadYearlyViz() {
+  var saved = localStorage.getItem(YEARLY_VIZ_KEY);
+  if (saved) {
+    try {
+      var parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length === 12) return parsed;
+    } catch(e) {}
+  }
+  return new Array(12).fill('');
+}
+
+function saveYearlyViz(months) {
+  localStorage.setItem(YEARLY_VIZ_KEY, JSON.stringify(months));
+}
+
+var yearlyVizMonths = loadYearlyViz();
+
+function renderYearlyViz() {
+  yearlyMonthsList.innerHTML = '';
+  var currentMonthIdx = new Date().getMonth(); // 0=Jan ... 11=Dec, matches our array directly
+
+  for (var i = 0; i < 12; i++) {
+    var row = document.createElement('div');
+    row.className = 'weekly-day-row' + (i === currentMonthIdx ? ' is-today' : '');
+
+    var num = document.createElement('span');
+    num.className = 'weekly-day-num';
+    num.textContent = String(i + 1);
+
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'weekly-day-input';
+    input.placeholder = '...';
+    input.value = yearlyVizMonths[i] || '';
+    (function(idx) {
+      input.addEventListener('input', function() {
+        yearlyVizMonths[idx] = input.value;
+        saveYearlyViz(yearlyVizMonths);
+      });
+    })(i);
+
+    row.appendChild(num);
+    row.appendChild(input);
+    yearlyMonthsList.appendChild(row);
   }
 }
 
@@ -3199,6 +3280,7 @@ renderEntries();
 renderMusts();
 loadTackle();
 renderWeeklyViz();
+renderYearlyViz();
 updateLive();
 setInterval(updateLive, 1000);
 
