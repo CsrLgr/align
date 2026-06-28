@@ -2788,9 +2788,31 @@ function renderOneClanCardRefresh(clan, membersWrap) {
 // Given a member's own blocks, figures out which one is "current"
 // right now using the same 6am-anchored math the main Ruler uses —
 // just applied to someone else's block data instead of your own.
-function findMemberCurrentBlock(memberBlocks) {
+// Same idea as getSinceSix(), but computed in a SPECIFIC timezone
+// rather than the viewer's own. Needed because a clan member's
+// current block must be calculated using THEIR local 6am, not the
+// person looking at the screen's 6am — otherwise everyone's card
+// shows the wrong block except your own.
+function getSinceSixInTimezone(timezone) {
+  try {
+    var now = new Date();
+    var parts = now.toLocaleString('en-US', {
+      timeZone: timezone, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+    });
+    var bits = parts.split(':');
+    var hours = parseInt(bits[0], 10);
+    var minutes = parseInt(bits[1], 10);
+    var seconds = parseInt(bits[2], 10) || 0;
+    var realMinutes = hours * 60 + minutes + seconds / 60;
+    return (realMinutes - DAY_START_OFFSET + 1440) % 1440;
+  } catch (e) {
+    return getSinceSix(); // fall back to viewer's own time if the timezone is somehow invalid
+  }
+}
+
+function findMemberCurrentBlock(memberBlocks, timezone) {
   if (!memberBlocks || !memberBlocks.length) return null;
-  var sinceSix = getSinceSix();
+  var sinceSix = getSinceSixInTimezone(timezone);
   var cumulative = 0;
   for (var i = 0; i < memberBlocks.length; i++) {
     var b = memberBlocks[i];
@@ -2817,7 +2839,7 @@ function renderClanMembers(container, profiles, rulerMap) {
     nameSpan.textContent = profile.display_name + (profile.id === currentUser.id ? ' (you)' : '');
 
     var memberBlocks = rulerMap[profile.id] || [];
-    var currentBlock = findMemberCurrentBlock(memberBlocks);
+    var currentBlock = findMemberCurrentBlock(memberBlocks, profile.timezone);
 
     var blockSpan = document.createElement('span');
     blockSpan.className = 'clan-member-block';
