@@ -988,6 +988,34 @@
   .member-modal-text { font-size: 13px; color: #ccc; white-space: pre-wrap; }
   .member-modal-musts-row { font-size: 12px; color: #bbb; padding: 0.2rem 0; }
   .member-modal-loading { font-size: 12px; color: #777; }
+  .member-modal-time-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    font-size: 12px;
+    color: #ccc;
+    background: #1a1a1a;
+    border-radius: 6px;
+    padding: 0.6rem 0.75rem;
+    margin-bottom: 1.25rem;
+  }
+  .member-modal-time-row strong { color: #c0b5a5; }
+  .member-modal-write-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.6rem;
+  }
+  .member-modal-write-row input[type="text"] {
+    flex: 1;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 6px;
+    color: #eee;
+    font-family: Georgia, serif;
+    font-size: 12px;
+    padding: 0.5rem 0.6rem;
+  }
+  .member-modal-write-row input[type="text"]:focus { outline: 1px solid #c0b5a5; }
 
   .clans-locked {
     background: #161616;
@@ -2107,6 +2135,28 @@ function loadTackle() {
     } catch(e) {}
   }
 }
+
+// Pulls the latest whiteboard content from Supabase and merges it in,
+// so messages a clan-mate left while you were logged out (or on
+// another device) actually show up. Called on login. Without this,
+// the cloud copy could silently get overwritten the next time you
+// typed anything locally, since saveTackle() always pushes local ->
+// cloud with no awareness of what changed remotely in the meantime.
+function pullTackleFromSupabase() {
+  if (!supabaseClient || !currentUser) return;
+  supabaseClient.from('shared_sections')
+    .select('data')
+    .eq('user_id', currentUser.id)
+    .eq('section', 'whiteboard')
+    .then(function(result) {
+      var remoteText = result.data && result.data[0] && result.data[0].data && result.data[0].data.text;
+      if (typeof remoteText === 'string' && remoteText !== tackleArea.value) {
+        tackleArea.value = remoteText;
+        localStorage.setItem(TACKLE_KEY, JSON.stringify({ text: remoteText, shared: tackleShare.checked }));
+      }
+    });
+}
+
 function saveTackle() {
   localStorage.setItem(TACKLE_KEY, JSON.stringify({ text: tackleArea.value, shared: tackleShare.checked }));
   sectionShareState.whiteboard = tackleShare.checked;
@@ -2446,6 +2496,7 @@ function initAuth() {
       showClansUnlocked();
       loadAndRenderClans();
       pushMyRulerToSupabase();
+      if (typeof pullTackleFromSupabase === 'function') pullTackleFromSupabase();
     } else {
       renderAuthBarLoggedOut();
       showClansLocked();
@@ -2461,6 +2512,7 @@ function initAuth() {
       showClansUnlocked();
       loadAndRenderClans();
       pushMyRulerToSupabase();
+      if (typeof pullTackleFromSupabase === 'function') pullTackleFromSupabase();
     } else {
       currentUser = null;
       currentUserIsPaid = false;
@@ -2944,6 +2996,59 @@ function loadMemberDetailContent(profile, body) {
 
     body.innerHTML = '';
 
+    // Local time + current block — always shown, top of the modal.
+    var timeRow = document.createElement('div');
+    timeRow.className = 'member-modal-time-row';
+    var localInfo = getLocalTimeInfo(profile.timezone);
+    var currentBlock = findMemberCurrentBlock(memberBlocks, profile.timezone);
+    timeRow.innerHTML =
+      '<span><strong>Local time:</strong> ' + localInfo.text + '</span>' +
+      '<span><strong>Current block:</strong> ' + (currentBlock ? escapeHtml(currentBlock.name) : '—') + '</span>';
+    body.appendChild(timeRow);
+
+    // Whiteboard — ALWAYS shown by default, regardless of paid status
+    // or the member's own share toggle (per design: this is the one
+    // section meant to always be visible, since it's how clan-mates
+    // leave each other messages).
+    var whiteboardSection = document.createElement('div');
+    whiteboardSection.className = 'member-modal-section';
+    whiteboardSection.innerHTML = '<h4>Whiteboard</h4>';
+    var whiteboardData = (sections.whiteboard && sections.whiteboard.data) || {};
+    var whiteboardP = document.createElement('p');
+    whiteboardP.className = 'member-modal-text';
+    whiteboardP.textContent = whiteboardData.text || '(nothing written yet)';
+    whiteboardSection.appendChild(whiteboardP);
+
+    // Only PAID viewers can write a message onto someone else's
+    // whiteboard. It's always appended as a new line, never
+    // overwriting what's already there.
+    if (currentUserIsPaid && profile.id !== currentUser.id) {
+      var writeRow = document.createElement('div');
+      writeRow.className = 'member-modal-write-row';
+      var writeInput = document.createElement('input');
+      writeInput.type = 'text';
+      writeInput.placeholder = 'Leave a message on their whiteboard...';
+      var writeBtn = document.createElement('button');
+      writeBtn.textContent = 'Send';
+      writeBtn.addEventListener('click', function() {
+        var msg = writeInput.value.trim();
+        if (!msg) return;
+        writeBtn.disabled = true;
+        appendToMemberWhiteboard(profile, currentUser, msg, function(newText) {
+          whiteboardP.textContent = newText;
+          writeInput.value = '';
+          writeBtn.disabled = false;
+        });
+      });
+      writeInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); writeBtn.click(); }
+      });
+      writeRow.appendChild(writeInput);
+      writeRow.appendChild(writeBtn);
+      whiteboardSection.appendChild(writeRow);
+    }
+    body.appendChild(whiteboardSection);
+
     // Ruler — always shown
     var rulerSection = document.createElement('div');
     rulerSection.className = 'member-modal-section';
@@ -2960,17 +3065,6 @@ function loadMemberDetailContent(profile, body) {
     });
     rulerSection.appendChild(track);
     body.appendChild(rulerSection);
-
-    // Whiteboard — always shown if it's marked shared by the member.
-    // (Note: even though "always shown" per our spec, it still only
-    // shows real content if the member opted in — otherwise there's
-    // simply nothing to display, which is the correct outcome.)
-    appendSharedSectionIfAvailable(body, sections.whiteboard, 'Whiteboard', function(data) {
-      var p = document.createElement('p');
-      p.className = 'member-modal-text';
-      p.textContent = data.text || '(empty)';
-      return p;
-    });
 
     // Everything else (Musts, Weekly, Yearly) is paid-viewer-only,
     // and only shown if the member has individually shared it.
@@ -3025,6 +3119,45 @@ function buildSevenRowReadout(items) {
     list.innerHTML = '<span class="member-modal-loading">Nothing filled in yet.</span>';
   }
   return list;
+}
+
+function escapeHtml(str) {
+  var div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+
+// Appends a message from a paid clan-mate onto another member's
+// whiteboard, as a new line. Reads the current text first, adds the
+// new line, then writes the combined result back — this is what
+// makes it "append" rather than "overwrite": we're not patching a
+// single field, we're submitting a whole new text value that
+// includes everything that was there before, plus the new line.
+function appendToMemberWhiteboard(targetProfile, fromUser, message, onComplete) {
+  if (!supabaseClient) return;
+
+  supabaseClient.from('shared_sections')
+    .select('data')
+    .eq('user_id', targetProfile.id)
+    .eq('section', 'whiteboard')
+    .then(function(result) {
+      var existingText = (result.data && result.data[0] && result.data[0].data && result.data[0].data.text) || '';
+      var fromName = (fromUser.email || 'A clan-mate').split('@')[0];
+      var newLine = '[' + fromName + ']: ' + message;
+      var combinedText = existingText ? (existingText + '\n' + newLine) : newLine;
+
+      supabaseClient.from('shared_sections')
+        .update({ data: { text: combinedText }, updated_at: new Date().toISOString() })
+        .eq('user_id', targetProfile.id)
+        .eq('section', 'whiteboard')
+        .then(function(updateResult) {
+          if (updateResult.error) {
+            window.alert('Could not send message: ' + updateResult.error.message);
+            return;
+          }
+          if (typeof onComplete === 'function') onComplete(combinedText);
+        });
+    });
 }
 
 
