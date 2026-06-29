@@ -1318,7 +1318,14 @@ function snapshotTodayNow() {
   if (supabaseClient && currentUser) {
     supabaseClient.from('daily_snapshots')
       .upsert({ user_id: currentUser.id, snapshot_date: today, blocks: blocks })
-      .then(function(){});
+      .then(function(result) {
+        if (result.error) {
+          showToast('Saved locally, but cloud backup failed: ' + result.error.message, 'error');
+        }
+      })
+      .catch(function() {
+        showToast('Saved locally, but could not reach the server. Will not auto-retry this one — try the button again.', 'error');
+      });
   }
 }
 
@@ -2296,6 +2303,147 @@ if (window.supabase) {
   supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 }
 
+// ============================================================
+// Toast notifications — a small, visible place for sync failures
+// and successes to surface. Without this, a failed Supabase write
+// previously just vanished silently (".then(function(){})"), so the
+// person had no way of knowing their change didn't actually save.
+// ============================================================
+var toastContainer = document.createElement('div');
+toastContainer.id = 'toastContainer';
+toastContainer.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:200;display:flex;flex-direction:column;gap:8px;max-width:320px;';
+document.body.appendChild(toastContainer);
+
+function showToast(message, type) {
+  var toast = document.createElement('div');
+  var bg = type === 'error' ? '#5a2323' : (type === 'success' ? '#2f3b34' : '#1a1a1a');
+  var border = type === 'error' ? '#c77' : (type === 'success' ? '#7a9b7a' : '#444');
+  toast.style.cssText =
+    'background:' + bg + ';border:1px solid ' + border + ';color:#eee;' +
+    'font-family:Georgia,serif;font-size:12px;padding:0.7rem 0.9rem;' +
+    'border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,0.4);' +
+    'opacity:0;transition:opacity 0.25s;';
+  toast.textContent = message;
+  toastContainer.appendChild(toast);
+  requestAnimationFrame(function() { toast.style.opacity = '1'; });
+  setTimeout(function() {
+    toast.style.opacity = '0';
+    setTimeout(function() { toast.remove(); }, 300);
+  }, type === 'error' ? 6000 : 3500);
+}
+
+// ============================================================
+// Sync queue — every write that needs to reach Supabase goes through
+// here instead of being called directly. If the write fails (offline,
+// network hiccup, server error), it's persisted to localStorage and
+// retried automatically: immediately when the browser comes back
+// online, and on a periodic timer as a backstop in case the
+// "online"/"offline" browser events don't fire reliably.
+//
+// Each queued item is idempotent-ish by design: it always carries the
+// LATEST value for its key (e.g. "ruler:<userId>"), not a list of
+// historical deltas — so if three edits happen offline in a row, only
+// the final state needs to sync, not three separate operations.
+// ============================================================
+var SYNC_QUEUE_KEY = 'csrAlignSyncQueue';
+
+function loadSyncQueue() {
+  try {
+    return JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '{}');
+  } catch (e) {
+    return {};
+  }
+}
+
+function saveSyncQueue(queue) {
+  localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(queue));
+}
+
+// queueKey: a stable string identifying WHAT this write is (e.g.
+// "ruler", "section:musts") so a newer write for the same thing
+// replaces an older queued one rather than piling up.
+// performFn: function(payload) -> a Supabase promise-like (.then/.catch)
+function enqueueSync(queueKey, payload, performFn) {
+  attemptSync(queueKey, payload, performFn, true);
+}
+
+function attemptSync(queueKey, payload, performFn, isFirstTry) {
+  var result = performFn(payload);
+  if (!result || typeof result.then !== 'function') return;
+
+  result.then(function(response) {
+    if (response && response.error) {
+      handleSyncFailure(queueKey, payload, performFn, response.error.message);
+    } else {
+      clearFromQueue(queueKey);
+      if (!isFirstTry) showToast('Sync recovered — your changes are saved.', 'success');
+    }
+  }).catch(function(err) {
+    handleSyncFailure(queueKey, payload, performFn, (err && err.message) || 'Network error');
+  });
+}
+
+var MAX_SYNC_RETRIES = 5;
+
+function handleSyncFailure(queueKey, payload, performFn, errorMessage) {
+  var queue = loadSyncQueue();
+  var existing = queue[queueKey];
+  var retryCount = (existing ? existing.retryCount : 0) + 1;
+
+  queue[queueKey] = { payload: payload, queuedAt: new Date().toISOString(), retryCount: retryCount };
+  saveSyncQueue(queue);
+
+  if (retryCount >= MAX_SYNC_RETRIES) {
+    showToast(
+      'This change has failed to save ' + retryCount + ' times and will stop retrying automatically. ' +
+      'Your data is safe on this device, but other people (e.g. clan-mates) won\'t see it until you fix your connection and reopen the app.',
+      'error'
+    );
+  } else {
+    showToast('Could not save changes — will retry automatically (' + errorMessage + ')', 'error');
+  }
+}
+
+function clearFromQueue(queueKey) {
+  var queue = loadSyncQueue();
+  if (queue[queueKey]) {
+    delete queue[queueKey];
+    saveSyncQueue(queue);
+  }
+}
+
+// Registry of how to actually perform a retry for each queueKey
+// prefix, since the queue only stores plain JSON (payload + when),
+// not function references which can't be serialized.
+var syncPerformers = {};
+function registerSyncPerformer(prefix, performFn) {
+  syncPerformers[prefix] = performFn;
+}
+
+function retryQueuedSyncs(force) {
+  if (!supabaseClient || !currentUser) return;
+  var queue = loadSyncQueue();
+  Object.keys(queue).forEach(function(queueKey) {
+    var entry = queue[queueKey];
+    // Items that already gave up only retry on a real reconnect event
+    // (force=true), not the routine 30-second backstop timer — no
+    // point hammering a connection that's been failing for minutes.
+    if (!force && entry.retryCount >= MAX_SYNC_RETRIES) return;
+
+    var prefix = queueKey.split(':')[0];
+    var performFn = syncPerformers[prefix];
+    if (performFn) {
+      attemptSync(queueKey, entry.payload, performFn, false);
+    }
+  });
+}
+
+window.addEventListener('online', function() {
+  showToast('Back online — syncing your changes...', 'success');
+  retryQueuedSyncs(true);
+});
+setInterval(function() { retryQueuedSyncs(false); }, 30000); // backstop, respects the retry cap
+
 var authBar = document.getElementById('authBar');
 
 function renderAuthBarLoggedOut(message) {
@@ -2497,6 +2645,7 @@ function initAuth() {
       loadAndRenderClans();
       pushMyRulerToSupabase();
       if (typeof pullTackleFromSupabase === 'function') pullTackleFromSupabase();
+      if (typeof retryQueuedSyncs === 'function') retryQueuedSyncs(true);
     } else {
       renderAuthBarLoggedOut();
       showClansLocked();
@@ -2513,6 +2662,7 @@ function initAuth() {
       loadAndRenderClans();
       pushMyRulerToSupabase();
       if (typeof pullTackleFromSupabase === 'function') pullTackleFromSupabase();
+      if (typeof retryQueuedSyncs === 'function') retryQueuedSyncs(true);
     } else {
       currentUser = null;
       currentUserIsPaid = false;
@@ -2585,12 +2735,22 @@ function showClansMsg(text, isError) {
 }
 
 // Push this person's current Ruler blocks up to Supabase so clan
-// members can see it live. Called whenever blocks change.
+// members can see it live. Called whenever blocks change. Wired
+// through the sync queue: if this fails (offline, network blip),
+// it's retried automatically rather than silently lost.
+registerSyncPerformer('ruler', function(payload) {
+  return supabaseClient.from('shared_rulers')
+    .upsert({ user_id: payload.userId, blocks: payload.blocks, updated_at: payload.updatedAt });
+});
+
 function pushMyRulerToSupabase() {
   if (!supabaseClient || !currentUser) return;
-  supabaseClient.from('shared_rulers')
-    .upsert({ user_id: currentUser.id, blocks: blocks, updated_at: new Date().toISOString() })
-    .then(function(){});
+  var snapshot = JSON.parse(JSON.stringify(blocks)); // capture the exact state being saved, for rollback if needed
+  enqueueSync('ruler:' + currentUser.id, {
+    userId: currentUser.id,
+    blocks: snapshot,
+    updatedAt: new Date().toISOString()
+  }, syncPerformers.ruler);
 }
 
 // Generalized sync for the 4 opt-in shareable sections (Musts,
@@ -2599,17 +2759,20 @@ function pushMyRulerToSupabase() {
 // effect immediately without needing the data to also change.
 var sectionShareState = { musts: false, whiteboard: false, weekly: false, yearly: false };
 
+registerSyncPerformer('section', function(payload) {
+  return supabaseClient.from('shared_sections').upsert(payload);
+});
+
 function pushSharedSection(section, data) {
   if (!supabaseClient || !currentUser) return;
-  supabaseClient.from('shared_sections')
-    .upsert({
-      user_id: currentUser.id,
-      section: section,
-      data: data,
-      is_shared: !!sectionShareState[section],
-      updated_at: new Date().toISOString()
-    })
-    .then(function(){});
+  var payload = {
+    user_id: currentUser.id,
+    section: section,
+    data: JSON.parse(JSON.stringify(data)),
+    is_shared: !!sectionShareState[section],
+    updated_at: new Date().toISOString()
+  };
+  enqueueSync('section:' + currentUser.id + ':' + section, payload, syncPerformers.section);
 }
 
 function loadSectionShareState() {
@@ -2689,11 +2852,17 @@ document.getElementById('joinClanBtn').addEventListener('click', function() {
 function loadAndRenderClans() {
   if (!supabaseClient || !currentUser) return;
 
+  clansListEl.innerHTML = '<p style="font-size:12px;color:#666;">Loading your clans…</p>';
+
   supabaseClient.from('clan_members')
     .select('clan_id')
     .eq('user_id', currentUser.id)
     .then(function(memberResult) {
-      if (memberResult.error || !memberResult.data) return;
+      if (memberResult.error) {
+        clansListEl.innerHTML = '<p style="font-size:12px;color:#c77;">Could not load your clans — check your connection and try refreshing.</p>';
+        return;
+      }
+      if (!memberResult.data) return;
       var clanIds = memberResult.data.map(function(r) { return r.clan_id; });
 
       if (!clanIds.length) {
@@ -2705,9 +2874,19 @@ function loadAndRenderClans() {
         .select('id, name, invite_code, owner_id')
         .in('id', clanIds)
         .then(function(clansResult) {
-          if (clansResult.error || !clansResult.data) return;
+          if (clansResult.error) {
+            clansListEl.innerHTML = '<p style="font-size:12px;color:#c77;">Could not load clan details — check your connection and try refreshing.</p>';
+            return;
+          }
+          if (!clansResult.data) return;
           renderClansList(clansResult.data);
+        })
+        .catch(function() {
+          clansListEl.innerHTML = '<p style="font-size:12px;color:#c77;">Network error loading clans. Try refreshing.</p>';
         });
+    })
+    .catch(function() {
+      clansListEl.innerHTML = '<p style="font-size:12px;color:#c77;">Network error loading clans. Try refreshing.</p>';
     });
 }
 
@@ -3092,6 +3271,8 @@ function loadMemberDetailContent(profile, body) {
     if (!body.children.length) {
       body.innerHTML = '<p class="member-modal-loading">Nothing shared yet.</p>';
     }
+  }).catch(function() {
+    body.innerHTML = '<p class="member-modal-loading" style="color:#c77;">Could not load this member\'s data — check your connection and try again.</p>';
   });
 }
 
