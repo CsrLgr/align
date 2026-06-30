@@ -1357,6 +1357,17 @@ function saveBlocks() {
 
 var blocks = loadBlocks();
 
+// Stamps a single block with the current time, so the server-side
+// merge function (merge_ruler_blocks) can tell which device's edit
+// to THAT SPECIFIC block is newer, instead of one whole-array write
+// blindly overwriting another device's edit to a different block.
+// Call this at the exact moment a block actually changes (rename,
+// sleep toggle, drag-resize), never on every intermediate render.
+function stampBlock(idx) {
+  if (!blocks[idx]) return;
+  blocks[idx].block_updated_at = new Date().toISOString();
+}
+
 // ---- Render the ruler ----
 var rulerTrack = document.getElementById('rulerTrack');
 var blockEls = [];
@@ -1388,6 +1399,7 @@ function renderRuler() {
     nameSpan.spellcheck = false;
     nameSpan.addEventListener('blur', function() {
       blocks[idx].name = nameSpan.textContent.trim() || ('Block ' + (idx+1));
+      stampBlock(idx);
       saveBlocks();
       updateCurrentBlockInfo();
     });
@@ -1412,6 +1424,7 @@ function renderRuler() {
     sleepToggle.addEventListener('click', function(e) {
       e.stopPropagation();
       blocks[idx].sleep = !blocks[idx].sleep;
+      stampBlock(idx);
       saveBlocks();
       renderRuler();
       updateLive();
@@ -1496,6 +1509,8 @@ function startDrag(idx, startX, handleEl) {
     document.removeEventListener('mouseup', endHandler);
     document.removeEventListener('touchmove', touchMoveHandler);
     document.removeEventListener('touchend', endHandler);
+    stampBlock(idx);
+    stampBlock(idx + 1);
     saveBlocks();
   }
 
@@ -2744,9 +2759,21 @@ function showClansMsg(text, isError) {
 // members can see it live. Called whenever blocks change. Wired
 // through the sync queue: if this fails (offline, network blip),
 // it's retried automatically rather than silently lost.
+//
+// Calls the merge_ruler_blocks RPC instead of a plain upsert. A plain
+// upsert always replaces the WHOLE blocks array, so if you renamed
+// Block 3 on your phone and resized Block 7 on your laptop seconds
+// apart, whichever write landed last would silently wipe out the
+// other device's change. merge_ruler_blocks merges block-by-block on
+// the server, using each block's individual block_updated_at
+// timestamp (set by stampBlock()) to decide which device's edit to
+// THAT block wins — so two different blocks changed on two different
+// devices both survive.
 registerSyncPerformer('ruler', function(payload) {
-  return supabaseClient.from('shared_rulers')
-    .upsert({ user_id: payload.userId, blocks: payload.blocks, updated_at: payload.updatedAt });
+  return supabaseClient.rpc('merge_ruler_blocks', {
+    p_user_id: payload.userId,
+    p_blocks: payload.blocks
+  });
 });
 
 function pushMyRulerToSupabase() {
