@@ -1097,6 +1097,13 @@
   </div>
 </div>
 
+<div id="todaysMission" style="max-width:1100px;margin:0.75rem auto 0 auto;">
+  <span class="section-label">Today's Mission</span>
+  <span id="todaysMissionText" style="font-size:13px;color:#ddd;margin-left:0.5rem;"></span>
+  <input id="todaysMissionInput" type="text" placeholder="What's the mission for today?"
+    style="display:none;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#eee;font-family:Georgia,serif;font-size:13px;padding:0.45rem 0.6rem;width:100%;margin-top:0.4rem;">
+</div>
+
 <div class="ruler-container">
   <div class="progress-row">
     <span class="section-label">Today's Ruler</span>
@@ -2213,6 +2220,41 @@ function saveWeeklyViz(days) {
 
 var weeklyVizDays = loadWeeklyViz();
 
+// Renders the "Today's Mission" component, which mirrors the weekly
+// visualization slot for today. If the slot already has text, display
+// it as a read-only label. If it's empty, show an editable input that
+// writes back into weeklyVizDays and re-renders the weekly viz too,
+// so both components always reflect the same underlying data.
+function renderTodaysMission() {
+  var idx = todayAsMondayFirstIndex();
+  var text = weeklyVizDays[idx] || '';
+  var textEl = document.getElementById('todaysMissionText');
+  var inputEl = document.getElementById('todaysMissionInput');
+  if (!textEl || !inputEl) return;
+
+  if (text) {
+    textEl.textContent = text;
+    textEl.style.display = '';
+    inputEl.style.display = 'none';
+  } else {
+    textEl.style.display = 'none';
+    inputEl.style.display = '';
+    inputEl.value = '';
+    // Only attach the listener once — guard with a flag so re-renders
+    // don't stack duplicate listeners on the same element.
+    if (!inputEl._missionListenerAttached) {
+      inputEl._missionListenerAttached = true;
+      inputEl.addEventListener('input', function() {
+        weeklyVizDays[idx] = inputEl.value;
+        saveWeeklyViz(weeklyVizDays);
+        renderWeeklyViz();
+        // Switch to display mode as soon as the user types something.
+        if (inputEl.value.trim()) renderTodaysMission();
+      });
+    }
+  }
+}
+
 // JS Date.getDay() returns 0=Sunday...6=Saturday. We want Monday=1
 // ... Sunday=7, so this converts between the two.
 function todayAsMondayFirstIndex() {
@@ -2244,6 +2286,7 @@ function renderWeeklyViz() {
       input.addEventListener('input', function() {
         weeklyVizDays[idx] = input.value;
         saveWeeklyViz(weeklyVizDays);
+        if (idx === todayIdx) renderTodaysMission();
       });
     })(i);
 
@@ -4130,6 +4173,7 @@ renderMusts();
 loadTackle();
 renderWeeklyViz();
 renderYearlyViz();
+renderTodaysMission();
 updateLive();
 setInterval(updateLive, 1000);
 
