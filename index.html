@@ -2240,18 +2240,15 @@ function renderTodaysMission() {
     textEl.style.display = 'none';
     inputEl.style.display = '';
     inputEl.value = '';
-    // Only attach the listener once — guard with a flag so re-renders
-    // don't stack duplicate listeners on the same element.
-    if (!inputEl._missionListenerAttached) {
-      inputEl._missionListenerAttached = true;
-      inputEl.addEventListener('input', function() {
-        weeklyVizDays[idx] = inputEl.value;
-        saveWeeklyViz(weeklyVizDays);
-        renderWeeklyViz();
-        // Switch to display mode as soon as the user types something.
-        if (inputEl.value.trim()) renderTodaysMission();
-      });
-    }
+    // Replace with a fresh clone to wipe any stale listeners before
+    // attaching a new one — avoids fragile flag approaches.
+    var fresh = inputEl.cloneNode(true);
+    inputEl.parentNode.replaceChild(fresh, inputEl);
+    fresh.addEventListener('input', function() {
+      weeklyVizDays[idx] = fresh.value;
+      saveWeeklyViz(weeklyVizDays);
+      renderWeeklyViz();
+    });
   }
 }
 
@@ -2294,6 +2291,13 @@ function renderWeeklyViz() {
     row.appendChild(input);
     weeklyDaysList.appendChild(row);
   }
+
+  // Keep Today's Mission in sync whenever the weekly viz re-renders
+  // (covers remote data pulls, page load, and any other trigger).
+  // Guard against calling before renderTodaysMission is defined —
+  // on first load renderWeeklyViz() runs before the function below it,
+  // but the startup call at the bottom of the script handles that case.
+  if (typeof renderTodaysMission === 'function') renderTodaysMission();
 }
 
 // ---- Yearly Visualization ----
