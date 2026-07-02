@@ -1099,9 +1099,9 @@
 
 <div id="todaysMission" style="max-width:1100px;margin:0.75rem auto 0 auto;">
   <span class="section-label">Today's Mission</span>
-  <span id="todaysMissionText" style="font-size:13px;color:#ddd;margin-left:0.5rem;"></span>
   <input id="todaysMissionInput" type="text" placeholder="What's the mission for today?"
-    style="display:none;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#eee;font-family:Georgia,serif;font-size:13px;padding:0.45rem 0.6rem;width:100%;margin-top:0.4rem;">
+    autocomplete="off"
+    style="background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#eee;font-family:Georgia,serif;font-size:13px;padding:0.45rem 0.6rem;width:100%;margin-top:0.4rem;">
 </div>
 
 <div class="ruler-container">
@@ -2225,46 +2225,32 @@ var weeklyVizDays = loadWeeklyViz();
 // it as a read-only label. If it's empty, show an editable input that
 // writes back into weeklyVizDays and re-renders the weekly viz too,
 // so both components always reflect the same underlying data.
+// Today's Mission — reads from and writes to today's weeklyVizDays slot.
+// One input, always visible, always in sync. No toggling, no cloning.
+function initTodaysMission() {
+  var idx = todayAsMondayFirstIndex();
+  var input = document.getElementById('todaysMissionInput');
+  if (!input) return;
+
+  // Set the current value from the weekly viz data.
+  input.value = weeklyVizDays[idx] || '';
+
+  input.addEventListener('input', function() {
+    weeklyVizDays[idx] = input.value;
+    saveWeeklyViz(weeklyVizDays);
+    // Keep the weekly viz row for today in sync.
+    var weeklyInput = document.getElementById('weeklyDayInput' + idx);
+    if (weeklyInput) weeklyInput.value = input.value;
+  });
+}
+
 function renderTodaysMission() {
   var idx = todayAsMondayFirstIndex();
-  var text = weeklyVizDays[idx] || '';
-  var textEl = document.getElementById('todaysMissionText');
-  var inputEl = document.getElementById('todaysMissionInput');
-  if (!textEl || !inputEl) return;
-
-  if (text) {
-    // Today's slot has content — show it as a label.
-    textEl.textContent = text;
-    textEl.style.display = '';
-    inputEl.style.display = 'none';
-  } else {
-    // Today's slot is empty — show the editable input.
-    // Do NOT reset inputEl.value here: if the user is mid-type and
-    // something else triggers a re-render, we must not wipe their text.
-    textEl.style.display = 'none';
-    inputEl.style.display = '';
-
-    // Attach the listener only if not already done for this element.
-    // We identify "already attached" by a property on the element itself
-    // rather than a shared flag, so clones from previous renders don't
-    // carry a stale idx into a new day.
-    if (inputEl._missionIdx !== idx) {
-      inputEl._missionIdx = idx;
-      // Clone to clear any old listener first, then re-attach.
-      var fresh = inputEl.cloneNode(true);
-      fresh._missionIdx = idx;
-      inputEl.parentNode.replaceChild(fresh, inputEl);
-      fresh.addEventListener('input', function() {
-        weeklyVizDays[idx] = fresh.value;
-        saveWeeklyViz(weeklyVizDays);
-        // Sync the weekly viz DOM input for today directly — no full
-        // re-render, which avoids mutual recursion and mid-type resets.
-        var weeklyInput = document.getElementById('weeklyDayInput' + idx);
-        if (weeklyInput) weeklyInput.value = fresh.value;
-        // Switch to display mode once something is actually typed.
-        if (fresh.value.trim()) renderTodaysMission();
-      });
-    }
+  var input = document.getElementById('todaysMissionInput');
+  if (!input) return;
+  // Only update the value if the input isn't focused (don't interrupt typing).
+  if (document.activeElement !== input) {
+    input.value = weeklyVizDays[idx] || '';
   }
 }
 
@@ -4187,7 +4173,7 @@ renderMusts();
 loadTackle();
 renderWeeklyViz();
 renderYearlyViz();
-renderTodaysMission();
+initTodaysMission();
 updateLive();
 setInterval(updateLive, 1000);
 
