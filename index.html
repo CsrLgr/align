@@ -2233,22 +2233,38 @@ function renderTodaysMission() {
   if (!textEl || !inputEl) return;
 
   if (text) {
+    // Today's slot has content — show it as a label.
     textEl.textContent = text;
     textEl.style.display = '';
     inputEl.style.display = 'none';
   } else {
+    // Today's slot is empty — show the editable input.
+    // Do NOT reset inputEl.value here: if the user is mid-type and
+    // something else triggers a re-render, we must not wipe their text.
     textEl.style.display = 'none';
     inputEl.style.display = '';
-    inputEl.value = '';
-    // Replace with a fresh clone to wipe any stale listeners before
-    // attaching a new one — avoids fragile flag approaches.
-    var fresh = inputEl.cloneNode(true);
-    inputEl.parentNode.replaceChild(fresh, inputEl);
-    fresh.addEventListener('input', function() {
-      weeklyVizDays[idx] = fresh.value;
-      saveWeeklyViz(weeklyVizDays);
-      renderWeeklyViz();
-    });
+
+    // Attach the listener only if not already done for this element.
+    // We identify "already attached" by a property on the element itself
+    // rather than a shared flag, so clones from previous renders don't
+    // carry a stale idx into a new day.
+    if (inputEl._missionIdx !== idx) {
+      inputEl._missionIdx = idx;
+      // Clone to clear any old listener first, then re-attach.
+      var fresh = inputEl.cloneNode(true);
+      fresh._missionIdx = idx;
+      inputEl.parentNode.replaceChild(fresh, inputEl);
+      fresh.addEventListener('input', function() {
+        weeklyVizDays[idx] = fresh.value;
+        saveWeeklyViz(weeklyVizDays);
+        // Sync the weekly viz DOM input for today directly — no full
+        // re-render, which avoids mutual recursion and mid-type resets.
+        var weeklyInput = document.getElementById('weeklyDayInput' + idx);
+        if (weeklyInput) weeklyInput.value = fresh.value;
+        // Switch to display mode once something is actually typed.
+        if (fresh.value.trim()) renderTodaysMission();
+      });
+    }
   }
 }
 
@@ -2292,12 +2308,6 @@ function renderWeeklyViz() {
     weeklyDaysList.appendChild(row);
   }
 
-  // Keep Today's Mission in sync whenever the weekly viz re-renders
-  // (covers remote data pulls, page load, and any other trigger).
-  // Guard against calling before renderTodaysMission is defined —
-  // on first load renderWeeklyViz() runs before the function below it,
-  // but the startup call at the bottom of the script handles that case.
-  if (typeof renderTodaysMission === 'function') renderTodaysMission();
 }
 
 // ---- Yearly Visualization ----
